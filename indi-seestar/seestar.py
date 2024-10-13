@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-import sys
+
 import os
-from pathlib import Path
-import random
-import requests
+import sys
 import json
 import toml
+import random
+import requests
+from pathlib import Path
 sys.path.insert(0, str(Path.cwd().parent))
-from pyindi.device import (device as Device, INumberVector, ISwitchVector,
-                           INumber, ISwitch, IPerm, IPState, ISState, ISRule)
 from astropy import units
 from astropy.coordinates import SkyCoord
+from pyindi.device import (device as Device, INumberVector, ISwitchVector,
+                           INumber, ISwitch, IPerm, IPState, ISState, ISRule)
 
 """
 This file uses a skeleton xml file to initialize and
