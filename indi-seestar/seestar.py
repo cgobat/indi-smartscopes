@@ -7,8 +7,8 @@ import requests
 import json
 import toml
 sys.path.insert(0, str(Path.cwd().parent))
-from pyindi.device import device
-from pyindi import device as INDIDevice
+from pyindi.device import (device as Device, INumberVector, ISwitchVector,
+                           INumber, ISwitch, IPerm, IPState, ISState, ISRule)
 from astropy import units
 from astropy.coordinates import SkyCoord
 
@@ -18,7 +18,7 @@ define properties for the Seestar S50. Similar to this example at indilib:
 https://www.indilib.org/developers/driver-howto.html#h2-properties
 """
 
-class SeeStarDevice(device):
+class SeeStarDevice(Device):
 
     def __init__(self, name=None, number=1):
         """
@@ -37,23 +37,23 @@ class SeeStarDevice(device):
         Property definitions are generated
         by initProperties and buildSkeleton. No
         need to do it here. """
-        ra =  INDIDevice.INumber( "RA", "%2.8f", 0, 24, 1, 0, label="RA" )
-        dec = INDIDevice.INumber( "DEC", "%2.8f", -90, 90, 1, -90, label="DEC" )
-        coord = INDIDevice.INumberVector( [ra, dec], self._devname, "EQUATORIAL_EOD_COORD",
-                INDIDevice.IPState.OK, INDIDevice.IPerm.RW, label="EQUATORIAL_EOD_COORD")
+        ra =  INumber( "RA", "%2.8f", 0, 24, 1, 0, label="RA" )
+        dec = INumber( "DEC", "%2.8f", -90, 90, 1, -90, label="DEC" )
+        coord = INumberVector([ra, dec], self._devname, "EQUATORIAL_EOD_COORD",
+                              IPState.OK, IPerm.RW, label="EQUATORIAL_EOD_COORD")
  
-        connect = INDIDevice.ISwitch("CONNECT", INDIDevice.ISState.OFF, "Connect", )
-        disconnect = INDIDevice.ISwitch("DISCONNECT", INDIDevice.ISState.ON, "Disconnect")
-        conn = INDIDevice.ISwitchVector([connect, disconnect], self._devname, "CONNECTION",
-                INDIDevice.IPState.IDLE, INDIDevice.ISRule.ONEOFMANY, 
-                INDIDevice.IPerm.RW, label="Connection")
+        connect = ISwitch("CONNECT", ISState.OFF, "Connect", )
+        disconnect = ISwitch("DISCONNECT", ISState.ON, "Disconnect")
+        conn = ISwitchVector([connect, disconnect], self._devname, "CONNECTION",
+                IPState.IDLE, ISRule.ONEOFMANY, 
+                IPerm.RW, label="Connection")
                 
-        slew = INDIDevice.ISwitch("SLEW", INDIDevice.ISState.ON, "Slew", )
-        track = INDIDevice.ISwitch("TRACK", INDIDevice.ISState.OFF, "Track")
-        sync = INDIDevice.ISwitch("SYNC", INDIDevice.ISState.OFF, "Sync")
-        oncoordset = INDIDevice.ISwitchVector([slew, track, sync], self._devname, "ON_COORD_SET",
-                INDIDevice.IPState.IDLE, INDIDevice.ISRule.ONEOFMANY, 
-                INDIDevice.IPerm.RW, label="On coord set")
+        slew = ISwitch("SLEW", ISState.ON, "Slew", )
+        track = ISwitch("TRACK", ISState.OFF, "Track")
+        sync = ISwitch("SYNC", ISState.OFF, "Sync")
+        oncoordset = ISwitchVector([slew, track, sync], self._devname, "ON_COORD_SET",
+                IPState.IDLE, ISRule.ONEOFMANY, 
+                IPerm.RW, label="On coord set")
                 
         self.IDDef(coord, None)
         self.IDDef(conn, None)
@@ -151,7 +151,7 @@ class SeeStarDevice(device):
                 self.IDMessage(f"IUUpdate error: {error}")
                 raise
             
-    @device.repeat(2000)
+    @Device.repeat(2000)
     def do_repeat(self):
         """
         This function is called every 2000.
