@@ -3,21 +3,134 @@
 import os
 import sys
 import json
+import time
 import toml
-import random
-import requests
+import socket
+import logging
+import threading
 from pathlib import Path
+from collections import defaultdict
 sys.path.insert(0, str(Path.cwd().parent))
 from astropy import units
 from astropy.coordinates import SkyCoord
 from pyindi.device import (device as Device, INumberVector, ISwitchVector,
                            INumber, ISwitch, IPerm, IPState, ISState, ISRule)
 
-"""
-This file uses a skeleton xml file to initialize and
-define properties for the Seestar S50. Similar to this example at indilib:
-https://www.indilib.org/developers/driver-howto.html#h2-properties
-"""
+
+CONTROL_PORT = 4700
+IMAGING_PORT = 4800
+LOGGING_PORT = 4801
+DEFAULT_ADDR = "seestar.local"
+connections_by_port = defaultdict(dict)
+
+logger = logging.getLogger(Path(__file__).stem)
+logging.basicConfig(force=True, level=logging.DEBUG,
+                    format="[%(levelname)s] %(message)s")
+
+
+class ConnectionManager:
+
+    def __init__(self, address: str, port: int):
+        global connections_by_port
+        self.address = str(address).strip()
+        self.port = int(port)
+        if self.port in connections_by_port[self.address]:
+            raise ConnectionError(f"Connection to {self.destination} already exists.")
+        self.socket = None
+        self.connected = False
+        self.cmd_id = 100
+        self.rpc_responses = {}
+        self.event_list = []
+        connections_by_port[self.address][self.port] = self
+    
+    @property
+    def destination(self) -> str:
+        return f"{self.address}:{self.port}"
+
+    def connect(self):
+        try:
+            self.socket = socket.create_connection((self.address, self.port))
+            logger.debug(f"Established socket connection with {self.destination}")
+            self.connected = True
+        except:
+            logger.exception(f"Error connecting to socket")
+            self.connected = False
+        return self.connected
+    
+    def disconnect(self):
+        self.socket.close()
+        self.connected = False
+
+    def send_rpc(self, data: dict):
+        try:
+            json_str = json.dumps(data).encode()
+            self.socket.sendall(json_str + b'\r\n')
+        except:
+            logger.exception("RPC send failed due to exception") 
+    
+    def rpc_command(self, command: str, **kwargs):
+        payload = {"id": self.cmd_id, "method": command}
+        payload.update(kwargs)
+        self.send_rpc(payload)
+        self.cmd_id += 1
+
+    def receive_msg_str(self):
+        try:
+            if self.socket is None or not self.connected:
+                raise socket.error("Socket not initialized")
+            data = self.socket.recv(1024 * 8)
+        except socket.timeout:
+            logger.warning("Socket timeout")
+            return None
+        except socket.error as e:
+            logger.exception("Error reading socket")
+            if self.socket is not None:
+                self.disconnect()
+            if self.connect():
+                return self.receive_msg()
+            return None
+        
+        try:
+            return data.decode()
+        except UnicodeDecodeError:
+            logger.warning(f"Failed to decode data: {data}")
+            return None
+    
+    @staticmethod
+    def parse_json(data: str) -> dict:
+        return json.loads(data.strip())
+    
+    def receive_loop(self):
+        remaining = ""
+        while True:
+            data = self.receive_msg_str()
+            if data:
+                remaining += data
+                first_idx = remaining.find("\r\n")
+
+                while first_idx >= 0:
+                    message = remaining[:first_idx]
+                    remaining = remaining[first_idx+2:]
+                    parsed = self.parse_json(message)
+                    first_idx = remaining.find("\r\n")
+                    if "jsonrpc" in parsed:
+                        self.rpc_responses[parsed["id"]] = parsed
+                    elif "Event" in parsed:
+                        self.event_list.append(parsed)
+                    else:
+                        logger.warning("Got non-RPC and non-Event message!")
+                    logger.debug(f"Received from {self.destination}:\n{json.dumps(parsed, indent=2, sort_keys=False)}")
+            
+            time.sleep(1)
+
+    def start_listening(self) -> threading.Thread:
+        if not self.connected:
+            self.connect()
+        thread = threading.Thread(target=self.receive_loop)
+        thread.start()
+        logger.debug(f"Started listening for messages from {self.destination}")
+        return thread
+
 
 class SeestarDevice(Device):
 
