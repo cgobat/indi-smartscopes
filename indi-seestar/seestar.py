@@ -18,7 +18,7 @@ define properties for the Seestar S50. Similar to this example at indilib:
 https://www.indilib.org/developers/driver-howto.html#h2-properties
 """
 
-class SeeStarDevice(Device):
+class SeestarDevice(Device):
 
     def __init__(self, name=None, number=1):
         """
@@ -223,6 +223,6 @@ class SeeStarDevice(Device):
 
 name = os.environ['INDIDEV']
 number = int(os.environ['INDICONFIG'])  #hijack to obtain device number
-ss = SeeStarDevice(name, number)
+ss = SeestarDevice(name, number)
 ss.start() 
  
