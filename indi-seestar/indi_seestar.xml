@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<driversList>
+    <devGroup group="CCDs">
+        <device label="INDI Seestar Camera">
+            <driver name="INDI Seestar Camera">indi_seestar_ccd</driver>
+            <version>0.0.1</version>
+        </device>
+    </devGroup>
+    <devGroup group="Filter Wheels">
+        <device label="INDI Seestar Filter Wheel">
+            <driver name="INDI Seestar Filter Wheel">indi_seestar_filterwheel</driver>
+            <version>0.0.1</version>
+        </device>
+    </devGroup>
+    <devGroup group="Focusers">
+        <device label="INDI Seestar Focuser">
+            <driver name="INDI Seestar Focuser">indi_seestar_focuser</driver>
+            <version>0.0.1</version>
+        </device>
+    </devGroup>
+    <devGroup group="Telescopes">
+        <device label="INDI Seestar Mount">
+            <driver name="INDI Seestar Mount">indi_seestar_mount</driver>
+            <version>0.0.1</version>
+        </device>
+    </devGroup>
+</driversList>
