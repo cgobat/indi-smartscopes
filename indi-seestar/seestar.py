@@ -65,20 +65,20 @@ class SeeStarDevice(Device):
         A text vector has been updated from 
         the client. 
         """
-        self.IDMessage(f"Updating {name} text")
+        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
         self.IUUpdate(device, name, names, values, Set=True)
 
     def ISNewNumber(self, device, name, names, values):
         """
         A number vector has been updated from the client.
         """
-        self.IDMessage(f"Updating {device} {name} {names} {values}")
+        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
         
         if name == "EQUATORIAL_EOD_COORD":
             current = self.__getitem__("EQUATORIAL_EOD_COORD")
             ra, dec = float(current['RA'].value), float(current['DEC'].value)
             
-            self.IDMessage(f'Current ra/dec: {ra}/{dec}')
+            self.IDMessage(f"Current pointing: RA={ra}, Dec={dec}")
             
             for index, value in enumerate(values):
                 if value == 'RA':
@@ -86,7 +86,7 @@ class SeeStarDevice(Device):
                 elif value == 'DEC':
                     dec = names[index]
                     
-            self.IDMessage(f'Requested ra/dec: {ra}/{dec}')
+            self.IDMessage(f"Requested RA/Dec: ({ra}, {dec})")
 
             switch = self.__getitem__('ON_COORD_SET')
             if switch['SLEW'].value == 'On' or switch['TRACK'].value == 'On':
@@ -97,7 +97,7 @@ class SeeStarDevice(Device):
                 ra_hms = target.ra.to_string(unit=units.hourangle, sep=('h', 'm', 's'))
                 dec_dms = target.dec.to_string(unit=units.deg, sep=('d', 'm', 's'))
                 
-                self.IDMessage(f'Requested ra/dec (str): {ra_hms}/{dec_dms}')
+                self.IDMessage(f"Requested RA/Dec (str): ({ra_hms}, {dec_dms})")
                 
                 payload = {
                     "Action": "goto_target",
@@ -128,7 +128,7 @@ class SeeStarDevice(Device):
         A switch has been updated from the client.
         """
 
-        self.IDMessage(f"Updating {device}, {name}, {names}, {values}")
+        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
 
         if name == "CONNECTION":
             try:
@@ -141,14 +141,14 @@ class SeeStarDevice(Device):
                 self.IDSet(conn)
 
             except Exception as error:
-                self.IDMessage(f"IUUpdate error: {error}")
+                self.IDMessage(f"Error updating CONNECTION property: {error}")
                 raise
         else:
             try:
                 prop = self.IUUpdate(device, name, names, values)
                 self.IDSet(prop)
             except Exception as error:
-                self.IDMessage(f"IUUpdate error: {error}")
+                self.IDMessage(f"Error updating {name} property: {error}")
                 raise
             
     @Device.repeat(2000)
@@ -162,7 +162,7 @@ class SeeStarDevice(Device):
             # return
             pass
             
-        self.IDMessage('Running repeat function')
+        self.IDMessage("Running repeat function")
         
         payload = {
             "Action": "method_sync",
@@ -219,7 +219,7 @@ class SeeStarDevice(Device):
             response = requests.put(self.url, data=payload, headers=self.headers)
         
         except Exception as error:
-            self.IDMessage(f"IUUpdate error: {error}")
+            self.IDMessage(f"Error terminating GoTo: {error}")
 
 name = os.environ['INDIDEV']
 number = int(os.environ['INDICONFIG'])  #hijack to obtain device number
