@@ -161,28 +161,39 @@ class SeestarScope(Device):
         Property definitions are generated
         by initProperties and buildSkeleton. No
         need to do it here. """
-        ra =  INumber( "RA", "%2.8f", 0, 24, 1, 0, label="RA" )
-        dec = INumber( "DEC", "%2.8f", -90, 90, 1, -90, label="DEC" )
-        coord = INumberVector([ra, dec], self._devname, "EQUATORIAL_EOD_COORD",
-                              IPState.OK, IPerm.RW, label="EQUATORIAL_EOD_COORD")
- 
-        connect = ISwitch("CONNECT", ISState.OFF, "Connect", )
-        disconnect = ISwitch("DISCONNECT", ISState.ON, "Disconnect")
-        conn = ISwitchVector([connect, disconnect], self._devname, "CONNECTION",
-                IPState.IDLE, ISRule.ONEOFMANY, 
-                IPerm.RW, label="Connection")
-                
-        slew = ISwitch("SLEW", ISState.ON, "Slew", )
-        track = ISwitch("TRACK", ISState.OFF, "Track")
-        sync = ISwitch("SYNC", ISState.OFF, "Sync")
-        oncoordset = ISwitchVector([slew, track, sync], self._devname, "ON_COORD_SET",
-                IPState.IDLE, ISRule.ONEOFMANY, 
-                IPerm.RW, label="On coord set")
-                
-        self.IDDef(coord, None)
-        self.IDDef(conn, None)
-        self.IDDef(oncoordset, None)
+
+        self.IDDef(INumberVector([INumber( "RA", "%2.8f", 0, 24, 1, 0, label="RA" ),
+                                  INumber( "DEC", "%2.8f", -90, 90, 1, -90, label="DEC" )],
+                                 self._devname, "EQUATORIAL_EOD_COORD", IPState.OK, IPerm.RW,
+                                 label="EQUATORIAL_EOD_COORD"),
+                   None)
+
+        self.IDDef(ISwitchVector([ISwitch("CONNECT", ISState.OFF, "Connect", ),
+                                  ISwitch("DISCONNECT", ISState.ON, "Disconnect")],
+                                 self._devname, "CONNECTION", IPState.IDLE, ISRule.ONEOFMANY,
+                                 IPerm.RW, label="Connection"),
+                   None)
+
+        self.IDDef(ISwitchVector([ISwitch("SLEW", ISState.ON, "Slew", ),
+                                  ISwitch("TRACK", ISState.OFF, "Track"),
+                                  ISwitch("SYNC", ISState.OFF, "Sync")],
+                                 self._devname, "ON_COORD_SET", IPState.IDLE, ISRule.ONEOFMANY,
+                                 IPerm.RW, label="On coord set"),
+                   None)
         
+        status = self.connection.send_cmd_and_await_response("get_device_state",
+                                                             params={"keys": ["device", "setting", "pi_status"]})
+        device = status["result"]["device"]
+        self.IDDef(INumberVector([INumber("TELESCOPE_APERTURE", format="%f", min=0, max=10000, step=1,
+                                          value=device["focal_len"]/device["fnumber"], label="Aperture (mm)"),
+                                  INumber("TELESCOPE_FOCAL_LENGTH", format="%f", min=0, max=100000, step=1,
+                                          value=device["focal_len"], label="Focal Length (mm)")],
+                                 self._devname, "TELESCOPE_INFO", IPState.IDLE, IPerm.RO, label="Optical Properties"),
+                   None)
+
+        self.IDDef(ISwitchVector([ISwitch("DEW_HEATER_STATE", ISState.ON if status["result"]["setting"]["heater_enable"] else ISState.OFF)],
+                                 self._devname, "DEW_HEATER", state=IPState.OK, rule=ISRule.ATMOST1, perm=IPerm.RW, label="Dew Heater Enable"),
+                   None)
 
     def ISNewText(self, device, name, values, names):
         """
@@ -199,7 +210,7 @@ class SeestarScope(Device):
         self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
         
         if name == "EQUATORIAL_EOD_COORD":
-            current = self.__getitem__("EQUATORIAL_EOD_COORD")
+            current = self["EQUATORIAL_EOD_COORD"]
             ra, dec = float(current['RA'].value), float(current['DEC'].value)
             
             self.IDMessage(f"Current pointing: RA={ra}, Dec={dec}")
@@ -212,20 +223,14 @@ class SeestarScope(Device):
                     
             self.IDMessage(f"Requested RA/Dec: ({ra}, {dec})")
 
-            switch = self.__getitem__('ON_COORD_SET')
-            if switch['SLEW'].value == 'On' or switch['TRACK'].value == 'On':
+            switch = self['ON_COORD_SET']
+            if switch['SLEW'].value == ISState.ON or switch['TRACK'].value == ISState.ON:
                 # Slew/GoTo requested
                 if self.goToInProgress():
                     self.terminateGoTo()
-                target = SkyCoord(ra * units.hourangle, dec * units.deg)
-                ra_hms = target.ra.to_string(unit=units.hourangle, sep=('h', 'm', 's'))
-                dec_dms = target.dec.to_string(unit=units.deg, sep=('d', 'm', 's'))
-                
-                self.IDMessage(f"Requested RA/Dec (str): ({ra_hms}, {dec_dms})")
-                
                 cmd = "iscope_start_view"
                 params = {"mode": "star", "target_ra_dec": [ra, dec], "target_name": "Stellarium Target", "lp_filter": False}
-            else:
+            elif switch["SYNC"].value == ISState.ON:
                 # Sync requested
                 cmd = "scope_sync"
                 params = [ra, dec]
