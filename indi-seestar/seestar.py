@@ -194,8 +194,9 @@ class SeestarScope(Device):
                                  self._devname, "TELESCOPE_INFO", IPState.IDLE, IPerm.RO, label="Optical Properties"),
                    None)
 
-        self.IDDef(ISwitchVector([ISwitch("DEW_HEATER_STATE", ISState.ON if status["result"]["setting"]["heater_enable"] else ISState.OFF)],
-                                 self._devname, "DEW_HEATER", state=IPState.OK, rule=ISRule.ATMOST1, perm=IPerm.RW, label="Dew Heater Enable"),
+        self.IDDef(ISwitchVector([ISwitch("DEW_HEATER_ENABLED", ISState.ON if status["result"]["setting"]["heater_enable"] else ISState.OFF),
+                                  ISwitch("DEW_HEATER_DISABLED", ISState.OFF if status["result"]["setting"]["heater_enable"] else ISState.ON)],
+                                 self._devname, "DEW_HEATER", state=IPState.OK, rule=ISRule.ONEOFMANY, perm=IPerm.RW, label="Dew Heater Enable"),
                    None)
 
     def ISNewText(self, device, name, values, names):
@@ -272,9 +273,9 @@ class SeestarScope(Device):
 
             elif name == "DEW_HEATER":
                 heater = self.IUUpdate(device, name, values, names)
-                if heater["DEW_HEATER_STATE"] == ISState.OFF:
+                if heater["DEW_HEATER_DISABLED"] == ISState.ON:
                     self.connection.rpc_command("set_setting", params=[{"heater_enable": False}])
-                elif heater["DEW_HEATER_STATE"] == ISState.ON:
+                elif heater["DEW_HEATER_ENABLED"] == ISState.ON:
                     self.connection.rpc_command("set_setting", params=[{"heater_enable": True}])
 
             else:
