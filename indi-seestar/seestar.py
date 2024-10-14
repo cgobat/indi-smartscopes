@@ -189,15 +189,15 @@ class SeestarDevice(Device):
         self.IDDef(oncoordset, None)
         
 
-    def ISNewText(self, device, name, names, values):
+    def ISNewText(self, device, name, values, names):
         """
         A text vector has been updated from 
         the client. 
         """
         self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
-        self.IUUpdate(device, name, names, values, Set=True)
+        self.IUUpdate(device, name, values, names, Set=True)
 
-    def ISNewNumber(self, device, name, names, values):
+    def ISNewNumber(self, device, name, values, names):
         """
         A number vector has been updated from the client.
         """
@@ -252,7 +252,7 @@ class SeestarDevice(Device):
                 self.IDMessage(f"Seestar command error: {error}")
                 
 
-    def ISNewSwitch(self, device, name, names, values):
+    def ISNewSwitch(self, device, name, values, names):
         """
         A switch has been updated from the client.
         """
@@ -261,7 +261,7 @@ class SeestarDevice(Device):
 
         if name == "CONNECTION":
             try:
-                conn = self.IUUpdate(device, name, names, values)
+                conn = self.IUUpdate(device, name, values, names)
                 if conn["CONNECT"].value == 'Off':
                     conn.state = "Idle"
                 else:
@@ -274,7 +274,7 @@ class SeestarDevice(Device):
                 raise
         else:
             try:
-                prop = self.IUUpdate(device, name, names, values)
+                prop = self.IUUpdate(device, name, values, names)
                 self.IDSet(prop)
             except Exception as error:
                 self.IDMessage(f"Error updating {name} property: {error}")
