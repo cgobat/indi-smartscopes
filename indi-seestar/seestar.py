@@ -13,8 +13,8 @@ from collections import defaultdict
 sys.path.insert(0, str(Path.cwd().parent))
 from astropy import units
 from astropy.coordinates import SkyCoord
-from pyindi.device import (device as Device, INumberVector, ISwitchVector,
-                           INumber, ISwitch, IPerm, IPState, ISState, ISRule)
+from pyindi.device import (device as Device, INumberVector, ISwitchVector, ITextVector,
+                           INumber, ISwitch, IText, IPerm, IPState, ISState, ISRule)
 
 
 CONTROL_PORT = 4700
@@ -147,7 +147,7 @@ class ConnectionManager:
         return thread
 
 
-class SeestarDevice(Device):
+class SeestarScope(Device):
 
     def __init__(self, name=None, number=1):
         """
@@ -350,8 +350,21 @@ class SeestarDevice(Device):
         except Exception as error:
             self.IDMessage(f"Error terminating GoTo: {error}")
 
+
+class SeestarCamera(Device):
+    ...
+
+
+class SeestarFocuser(Device):
+    ...
+
+
+class SeestarFilter(Device):
+    ...
+
+
 name = os.environ['INDIDEV']
 number = int(os.environ['INDICONFIG'])  #hijack to obtain device number
-ss = SeestarDevice(name, number)
+ss = SeestarScope(name, number)
 ss.start() 
  
