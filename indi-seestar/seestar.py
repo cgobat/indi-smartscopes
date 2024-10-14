@@ -6,6 +6,7 @@ import json
 import time
 import toml
 import socket
+import struct
 import logging
 import threading
 from pathlib import Path
@@ -329,7 +330,147 @@ class SeestarScope(Device):
 
 
 class SeestarCamera(Device):
-    ...
+    
+    def __init__(self, name=None, host="seestar.local"):
+        super().__init__(name=name)
+        global connections_by_port
+        self.ctl_connection = connections_by_port[host].get(CONTROL_PORT)
+        if self.ctl_connection is None:
+            self.ctl_connection = ConnectionManager(host, CONTROL_PORT)
+        self.img_connection = connections_by_port[host].get(IMAGING_PORT)
+        if self.img_connection is None:
+            self.img_connection = ConnectionManager(host, IMAGING_PORT)
+
+    def ISGetProperties(self, device=None):
+
+        cmd_id = self.ctl_connection.rpc_command("get_controls")
+        control_defs = self.ctl_connection.await_response(cmd_id)["result"]
+        cam_controls = []
+        for control in control_defs:
+            if control["name"].startswith("ISP_"):
+                continue # skip ISP controls
+            cmd_id = self.ctl_connection.rpc_command("get_control_value", params=[control["name"]])
+            response = self.ctl_connection.await_response(cmd_id)
+            try:
+                current_value = response["result"]["value"]
+            except KeyError:
+                logger.exception(f"{control['name']}: {response}")
+            if control["name"] == "Temperature":
+                temperature = INumber("CCD_TEMPERATURE_VALUE", format="%f", min=-273.15, max=100., step=0.1,
+                                      value=current_value, label="Temperature (degC)")
+                continue
+            elif control["read_only"]:
+                logger.warning(f"Read-only camera property: {control['name']}")
+                continue
+            number = INumber("CCD_"+control["name"].upper(), "%f", control["min"], control["max"],
+                             1, current_value, label=control["name"])
+            cam_controls.append(number)
+
+
+        self.IDDef(INumberVector([temperature], self._devname, "CCD_TEMPERATURE", IPState.OK, IPerm.RO, label="Camera Temperature"),
+                   None)
+        
+        self.IDDef(INumberVector(cam_controls, self._devname, "CCD_CONTROLS", IPState.OK, IPerm.RW, label="Camera Controls"),
+                   None)
+        
+        cmd_id = self.ctl_connection.rpc_command("get_camera_info")
+        cam_info = self.ctl_connection.await_response(cmd_id)["result"]
+        self.IDDef(INumberVector([INumber("CCD_MAX_X", format="%d", min=0, max=None, step=1, value=cam_info["chip_size"][0]),
+                                  INumber("CCD_MAX_Y", format="%d", min=0, max=None, step=1, value=cam_info["chip_size"][1]),
+                                  INumber("CCD_PIXEL_SIZE", format="%f", min=0, max=None, step=1, value=cam_info["pixel_size_um"]),
+                                  INumber("CCD_PIXEL_SIZE_X", format="%f", min=0, max=None, step=1, value=cam_info["pixel_size_um"]),
+                                  INumber("CCD_PIXEL_SIZE_Y", format="%f", min=0, max=None, step=1, value=cam_info["pixel_size_um"]),
+                                  INumber("CCD_BITSPERPIXEL", format="%d", min=0, max=32, step=4, value=16)],
+                                 self._devname, "CCD_INFO", IPState.IDLE, IPerm.RO, label="Camera Properties"),
+                   None)
+        
+        self.IDDef(ITextVector([IText("CFA_OFFSET_X", "0", "Bayer pattern X offset"),
+                                IText("CFA_OFFSET_Y", "0", "Bayer pattern Y offset"),
+                                IText("CFA_TYPE", "GRBG", "Bayer pattern order")], # TODO: read from 'debayer_pattern' instead of hardcoding
+                               self._devname, "CCD_CFA", IPState.IDLE, IPerm.RO, label="Bayer Pattern"),
+                   None)
+
+        self.IDDef(ISwitchVector([ISwitch("CONNECT", ISState.OFF, "Connect", ),
+                                  ISwitch("DISCONNECT", ISState.ON, "Disconnect")],
+                                 self._devname, "CONNECTION", IPState.IDLE, ISRule.ONEOFMANY,
+                                 IPerm.RW, label="Connection"),
+                   None)
+    
+    def ISNewText(self, device, name, values, names):
+        """
+        A text vector has been updated from 
+        the client. 
+        """
+        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
+        self.IUUpdate(device, name, values, names, Set=True)
+
+    def ISNewNumber(self, device, name, values, names):
+        """
+        A number vector has been updated from the client.
+        """
+        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
+        
+        if name == "CCD_EXPOSURE":
+            self.IDMessage(f"Initiating {values[0]} sec exposure")
+            
+            try:
+                self.ctl_connection.rpc_command("start_exposure", params={})
+                time.sleep(values[0])
+                self.ctl_connection.rpc_command("stop_exposure")
+                
+            except Exception as error:
+                self.IDMessage(f"Seestar command error: {error}")
+                
+
+    def ISNewSwitch(self, device, name, values, names):
+        """
+        A switch has been updated from the client.
+        """
+
+        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
+
+        try:
+            if name == "CONNECTION":
+                try:
+                    conn = self.IUUpdate(device, name, values, names)
+                    if conn["DISCONNECT"].value == ISState.ON:
+                        # self.ctl_connection.rpc_command("close_camera")
+                        self.ctl_connection.disconnect()
+                        self.img_connection.disconnect()
+                        conn.state = IPState.IDLE
+                    elif conn["CONNECT"].value == ISState.ON:
+                        self.ctl_connection.connect()
+                        # self.ctl_connection.rpc_command("open_camera")
+                        conn.state = IPState.OK
+
+                    self.IDSet(conn)
+
+                except Exception as error:
+                    self.IDMessage(f"Error updating CONNECTION property: {error}")
+                    raise
+            else:
+                prop = self.IUUpdate(device, name, values, names, Set=True)
+
+        except Exception as error:
+            self.IDMessage(f"Error updating {name} property: {error}")
+    
+    @Device.repeat(2000)
+    def do_repeat(self):
+        
+        self.IDMessage("Running camera loop")
+
+        try:
+            result = self.ctl_connection.send_cmd_and_await_response("get_control_value", params=["Temperature"])["result"]
+            self.IUUpdate(self._devname, 'CCD_TEMPERATURE', [result["value"]], ["CCD_TEMPERATURE_VALUE"], Set=True)
+            
+        except Exception as error:
+            self.IDMessage(f"Seestar communication error: {error}")
+    
+    @staticmethod
+    def parse_image_header(data: bytes):
+        pack_fmt = ">HHHIHHBBHH"
+        return dict(zip(["s1", "s2", "s3", "size", "s5", "s6", "code", "id", "width", "height"],
+                        struct.unpack(pack_fmt, data[:struct.calcsize(pack_fmt)])))
 
 
 class SeestarFocuser(Device):
