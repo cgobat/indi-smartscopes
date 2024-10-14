@@ -149,17 +149,12 @@ class ConnectionManager:
 
 class SeestarScope(Device):
 
-    def __init__(self, name=None, number=1):
+    def __init__(self, name=None, host=DEFAULT_ADDR):
         """
         Construct device with name and number
         """
         super().__init__(name=name)
-        self.number = number
-        self.url = f'http://localhost:5555/api/v1/telescope/{number}/action'
-        self.headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/json"
-        }
+        self.connection = ConnectionManager(host, CONTROL_PORT)
 
     def ISGetProperties(self, device=None):
         """
@@ -228,25 +223,16 @@ class SeestarScope(Device):
                 
                 self.IDMessage(f"Requested RA/Dec (str): ({ra_hms}, {dec_dms})")
                 
-                payload = {
-                    "Action": "goto_target",
-                    "Parameters": f'{{"target_name":"Stellarium Target", "ra":"{ra_hms}", "dec":"{dec_dms}", "is_j2000":false}}',
-                    "ClientID": "1",
-                    "ClientTransactionID": "999"
-                }
+                cmd = "iscope_start_view"
+                params = {"mode": "star", "target_ra_dec": [ra, dec], "target_name": "Stellarium Target", "lp_filter": False}
             else:
                 # Sync requested
-                payload = {
-                    "Action": "method_sync",
-                    "Parameters": f'{{"method":"scope_sync","params":[{ra}, {dec}]}}',
-                    "ClientID": "1",
-                    "ClientTransactionID": "999"
-                }
+                cmd = "scope_sync"
+                params = [ra, dec]
             
             try:
-                response = requests.put(self.url, data=payload, headers=self.headers)
-                
-                print(response.json())
+                response = self.connection.send_cmd_and_await_response(cmd, params=params)
+                self.IDMessage(f"Set RA/Dec to {(ra, dec)}")
                 
             except Exception as error:
                 self.IDMessage(f"Seestar command error: {error}")
@@ -257,28 +243,39 @@ class SeestarScope(Device):
         A switch has been updated from the client.
         """
 
-        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
+        try:
+            self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
 
-        if name == "CONNECTION":
-            try:
+            if name == "CONNECTION":
                 conn = self.IUUpdate(device, name, values, names)
-                if conn["CONNECT"].value == 'Off':
-                    conn.state = "Idle"
-                else:
-                    conn.state = "Ok"
+                if conn["DISCONNECT"].value == ISState.ON:
+                    self.connection.disconnect()
+                    conn.state = IPState.IDLE
+                elif conn["CONNECT"].value == ISState.ON:
+                    self.connection.connect(self.connection.address, self.connection.port)
+                    conn.state = IPState.OK
 
                 self.IDSet(conn)
 
-            except Exception as error:
-                self.IDMessage(f"Error updating CONNECTION property: {error}")
-                raise
-        else:
-            try:
+            elif name == "TELESCOPE_ABORT_MOTION":
+                keyvals = dict(zip(names, values))
+                if keyvals["ABORT_MOTION"] == ISState.ON:
+                    self.connection.rpc_command("scope_abort_slew")
+
+            elif name == "DEW_HEATER":
+                heater = self.IUUpdate(device, name, values, names)
+                if heater["DEW_HEATER_STATE"] == ISState.OFF:
+                    self.connection.rpc_command("set_setting", params=[{"heater_enable": False}])
+                elif heater["DEW_HEATER_STATE"] == ISState.ON:
+                    self.connection.rpc_command("set_setting", params=[{"heater_enable": True}])
+
+            else:
                 prop = self.IUUpdate(device, name, values, names)
                 self.IDSet(prop)
-            except Exception as error:
-                self.IDMessage(f"Error updating {name} property: {error}")
-                raise
+
+        except Exception as error:
+            self.IDMessage(f"Error updating {name} property: {error}")
+            raise
             
     @Device.repeat(2000)
     def do_repeat(self):
@@ -286,26 +283,11 @@ class SeestarScope(Device):
         This function is called every 2000.
         """
 
-        conn = self.__getitem__("CONNECTION")
-        if conn["CONNECT"].value == 'Off':
-            # return
-            pass
-            
         self.IDMessage("Running repeat function")
         
-        payload = {
-            "Action": "method_sync",
-            "Parameters": "{\"method\":\"scope_get_equ_coord\"}",
-            "ClientID": "1",
-            "ClientTransactionID": "999"
-        }
-        
         try:
-            response = requests.put(self.url, data=payload, headers=self.headers)
-
-            # parse response and update number vector
-            json = response.json()
-            result = json['Value']['result']
+            cmd_id = self.connection.rpc_command("scope_get_equ_coord")
+            result = self.connection.await_response(cmd_id)["result"]
             ra = result['ra']
             dec = result['dec']
             self.IUUpdate(self._devname, 'EQUATORIAL_EOD_COORD', [ra, dec], ['RA', 'DEC'], Set=True)
@@ -317,17 +299,9 @@ class SeestarScope(Device):
         """
         Return true if a GoTo is in progress, false otherwise
         """
-        payload = {
-            "Action": "method_sync",
-            "Parameters": "{\"method\":\"get_view_state\"}",
-            "ClientID": "1",
-            "ClientTransactionID": "999"
-        }
         
         try:
-            response = requests.put(self.url, data=payload, headers=self.headers)
-            json = response.json()
-            result = json['Value']['result']
+            result = self.connection.send_cmd_and_await_response("get_view_state")["result"]
             return result['View']['stage'] == 'AutoGoto'
         
         except Exception as error:
@@ -337,15 +311,9 @@ class SeestarScope(Device):
         """
         Terminates current GoTo operation
         """
-        payload = {
-            "Action": "method_sync",
-            "Parameters": "{\"method\":\"iscope_stop_view\",\"params\":{\"stage\":\"AutoGoto\"}}",
-            "ClientID": "1",
-            "ClientTransactionID": "999"
-        }
         
         try:
-            response = requests.put(self.url, data=payload, headers=self.headers)
+            self.connection.rpc_command("iscope_stop_view", params={"stage": "AutoGoto"})
         
         except Exception as error:
             self.IDMessage(f"Error terminating GoTo: {error}")
