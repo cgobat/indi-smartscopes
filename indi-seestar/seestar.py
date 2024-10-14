@@ -73,6 +73,7 @@ class ConnectionManager:
         payload.update(kwargs)
         self.send_rpc(payload)
         self.cmd_id += 1
+        return payload["id"]
 
     def receive_msg_str(self):
         try:
@@ -115,6 +116,8 @@ class ConnectionManager:
                     first_idx = remaining.find("\r\n")
                     if "jsonrpc" in parsed:
                         self.rpc_responses[parsed["id"]] = parsed
+                        if parsed.get("code", 0):
+                            logger.warning(f"Got non-zero return code in response to RPC command '{parsed['method']}' (ID: {parsed['id']})")
                     elif "Event" in parsed:
                         self.event_list.append(parsed)
                     else:
@@ -122,10 +125,22 @@ class ConnectionManager:
                     logger.debug(f"Received from {self.destination}:\n{json.dumps(parsed, indent=2, sort_keys=False)}")
             
             time.sleep(1)
+    
+    def await_response(self, rpc_id: int):
+        while rpc_id not in self.rpc_responses:
+            time.sleep(0.01)
+        return self.rpc_responses[rpc_id]
+    
+    def send_cmd_and_await_response(self, command, **kwargs) -> dict:
+        cmd_id = self.rpc_command(command, **kwargs)
+        return self.await_response(cmd_id)
 
     def start_listening(self) -> threading.Thread:
         if not self.connected:
             self.connect()
+        if not self.connected:
+            logger.error("Socket not connected. Can't listen for messages.")
+            return None
         thread = threading.Thread(target=self.receive_loop)
         thread.start()
         logger.debug(f"Started listening for messages from {self.destination}")
