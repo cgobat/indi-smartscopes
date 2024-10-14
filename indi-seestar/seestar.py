@@ -165,19 +165,19 @@ class SeestarScope(Device):
         by initProperties and buildSkeleton. No
         need to do it here. """
 
-        self.IDDef(INumberVector([INumber( "RA", "%2.8f", 0, 24, 1, 0, label="RA" ),
-                                  INumber( "DEC", "%2.8f", -90, 90, 1, -90, label="DEC" )],
+        self.IDDef(INumberVector([INumber("RA", "%2.8f", 0, 24, 1, 0, label="RA"),
+                                  INumber("DEC", "%2.8f", -90, 90, 1, -90, label="DEC")],
                                  self._devname, "EQUATORIAL_EOD_COORD", IPState.OK, IPerm.RW,
-                                 label="EQUATORIAL_EOD_COORD"),
+                                 label="Pointing Coordinates"),
                    None)
 
-        self.IDDef(ISwitchVector([ISwitch("CONNECT", ISState.OFF, "Connect", ),
+        self.IDDef(ISwitchVector([ISwitch("CONNECT", ISState.OFF, "Connect"),
                                   ISwitch("DISCONNECT", ISState.ON, "Disconnect")],
                                  self._devname, "CONNECTION", IPState.IDLE, ISRule.ONEOFMANY,
                                  IPerm.RW, label="Connection"),
                    None)
 
-        self.IDDef(ISwitchVector([ISwitch("SLEW", ISState.ON, "Slew", ),
+        self.IDDef(ISwitchVector([ISwitch("SLEW", ISState.ON, "Slew"),
                                   ISwitch("TRACK", ISState.OFF, "Track"),
                                   ISwitch("SYNC", ISState.OFF, "Sync")],
                                  self._devname, "ON_COORD_SET", IPState.IDLE, ISRule.ONEOFMANY,
