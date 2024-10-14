@@ -154,7 +154,10 @@ class SeestarScope(Device):
         Construct device with name and number
         """
         super().__init__(name=name)
-        self.connection = ConnectionManager(host, CONTROL_PORT)
+        global connections_by_port
+        self.connection = connections_by_port[host].get(CONTROL_PORT)
+        if self.connection is None:
+            self.connection = ConnectionManager(host, CONTROL_PORT)
 
     def ISGetProperties(self, device=None):
         """
@@ -257,7 +260,7 @@ class SeestarScope(Device):
                     self.connection.disconnect()
                     conn.state = IPState.IDLE
                 elif conn["CONNECT"].value == ISState.ON:
-                    self.connection.connect(self.connection.address, self.connection.port)
+                    self.connection.connect()
                     conn.state = IPState.OK
 
                 self.IDSet(conn)
