@@ -355,8 +355,55 @@ class SeestarFilter(Device):
     ...
 
 
-name = os.environ['INDIDEV']
-number = int(os.environ['INDICONFIG'])  #hijack to obtain device number
-ss = SeestarScope(name, number)
-ss.start() 
- 
+if __name__ == "__main__":
+
+    scope_connection = RPCConnectionManager(DEFAULT_ADDR, CONTROL_PORT)
+    scope_connection.start_listening()
+    camera_connection = ImageConnectionManager(DEFAULT_ADDR, IMAGING_PORT)
+    camera_connection.start_listening()
+    log_connection = LogConnectionManager(DEFAULT_ADDR, LOGGING_PORT)
+    log_connection.start_listening()
+
+    # while not scope_connection.event_list:
+    #     time.sleep(0.01)
+    # initial_event = scope_connection.event_list[0]
+    # t0 = float(initial_event["Timestamp"])
+    # logger.debug(f"Initial event recorded at t={t0}")
+    # now = time.gmtime()
+
+    # scope_connection.rpc_command("pi_set_time",
+    #                              params={"year": now.tm_year, "mon": now.tm_mon, "day": now.tm_mday,
+    #                                      "hour": now.tm_hour, "min": now.tm_min, "sec": now.tm_sec,
+    #                                      "time_zone": "Etc/UTC"})
+    # scope_connection.rpc_command("get_view_state")
+    # # time.sleep(0.1)
+    # scope_connection.rpc_command("get_device_state", params={"keys": ["device", "camera", "pi_status"]})
+    # time.sleep(0.1)
+    # scope_connection.rpc_command("scope_get_ra_dec")
+    # time.sleep(0.1)
+    # scope_connection.rpc_command("get_camera_state")
+    # time.sleep(0.1)
+    # scope_connection.rpc_command("get_wheel_state")
+    # time.sleep(0.1)
+    # scope_connection.rpc_command("get_camera_info")
+    # time.sleep(0.1)
+    # scope_connection.rpc_command("pi_get_info")
+    # time.sleep(0.1)
+    # camera_connection.rpc_command("get_rtmp_config")
+    # time.sleep(0.1)
+    # scope_connection.rpc_command("scope_is_moving")
+    # time.sleep(0.1)
+    # scope_connection.rpc_command("get_setting")
+    # time.sleep(0.1)
+    # scope_connection.rpc_command("get_camera_exp_and_bin")
+    # time.sleep(0.1)
+    # scope_connection.rpc_command("get_control_value", params=["Exposure"])
+
+    # scope = SeestarScope("MySeestar")
+    # scope.start()
+    # print(cam)
+    # time.sleep(0.2)
+    # print(cam["CCD_TEMPERATURE"].elements)
+    # time.sleep(0.2)
+    # print(cam["CCD_TEMPERATURE"].elements)
+    # print(cam["CCD_CONTROLS"].elements)
