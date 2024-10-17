@@ -125,7 +125,7 @@ class BaseConnectionManager(abc.ABC):
         try:
             json_str = json.dumps(data).encode()
             with self.request_fifo.open("wb") as fifo:
-                fifo.write(json_str)
+                fifo.write(json_str+b'\r\n')
         except:
             logger.exception(f"Failed to write JSON to FIFO {self.request_fifo}")
 
