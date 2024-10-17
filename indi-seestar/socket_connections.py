@@ -130,6 +130,7 @@ class BaseConnectionManager(abc.ABC):
         with self.response_fifo.open("rb") as fifo:
             for line in fifo:
                 return line
+        return b''
 
     def start_listening(self) -> threading.Thread:
         if not self.connected:
