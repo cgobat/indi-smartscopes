@@ -374,6 +374,7 @@ if __name__ == "__main__":
         filter_wheel.start()
     else:
         if "--set-time" in sys.argv:
+            logger.info(f"Setting Seestar time to {now}")
             scope_connection.rpc_command("pi_set_time",
                                          params={"year": now.tm_year, "mon": now.tm_mon, "day": now.tm_mday,
                                                  "hour": now.tm_hour, "min": now.tm_min, "sec": now.tm_sec,

@@ -34,6 +34,7 @@ def listen_send(address: str, port: int):
         try:
             with input_fifo.open("rb") as fifo:
                 for line in fifo:
+                    logger.debug(f"Sending {len(line)}B to {address}:{port}")
                     sock.sendall(line)
         except (socket.timeout, socket.error):
             logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
@@ -50,8 +51,10 @@ def listen_recv(address: str, port: int):
     while True:
         try:
             data = sock.recv(1024*64)
-            with output_fifo.open("wb") as fifo:
-                fifo.write(data)
+            if data:
+                logger.debug(f"Got {len(data)}B from {address}:{port}")
+                with output_fifo.open("wb") as fifo:
+                    fifo.write(data)
         except (socket.timeout, socket.error):
             logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
             sock.close()
@@ -138,7 +141,7 @@ class BaseConnectionManager(abc.ABC):
             return None
         thread = threading.Thread(target=self.receive_loop)
         thread.start()
-        logger.debug(f"Started listening for messages from {self.destination}")
+        logger.debug(f"Started listening for messages at {self.response_fifo}")
         return thread
     
     @abc.abstractmethod
@@ -186,7 +189,7 @@ class RPCConnectionManager(BaseConnectionManager):
                             self.event_list.append(parsed)
                         else:
                             logger.warning("Got non-RPC and non-Event message!")
-                        logger.debug(f"Received from {self.destination}:\n{json.dumps(parsed, indent=2, sort_keys=False)}")
+                        logger.debug(f"Received message:\n{json.dumps(parsed, indent=2, sort_keys=False)}")
             
             time.sleep(1)
     
