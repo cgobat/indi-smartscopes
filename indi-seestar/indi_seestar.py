@@ -10,6 +10,7 @@ sys.path.append(Path(__file__).parent.as_posix())
 from socket_connections import (connections_by_port, DEFAULT_ADDR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT,
                                 RPCConnectionManager, ImageConnectionManager, LogConnectionManager)
 
+THIS_FILE_PATH = Path(__file__) # leave symlinks as-is/unresolved
 
 logger = logging.getLogger(Path(__file__).stem)
 logging.basicConfig(force=True, level=logging.DEBUG,
@@ -359,37 +360,48 @@ if __name__ == "__main__":
     # logger.debug(f"Initial event recorded at t={t0}")
     # now = time.gmtime()
 
-    # scope_connection.rpc_command("pi_set_time",
-    #                              params={"year": now.tm_year, "mon": now.tm_mon, "day": now.tm_mday,
-    #                                      "hour": now.tm_hour, "min": now.tm_min, "sec": now.tm_sec,
-    #                                      "time_zone": "Etc/UTC"})
-    # scope_connection.rpc_command("get_view_state")
-    # # time.sleep(0.1)
-    # scope_connection.rpc_command("get_device_state", params={"keys": ["device", "camera", "pi_status"]})
-    # time.sleep(0.1)
-    # scope_connection.rpc_command("scope_get_ra_dec")
-    # time.sleep(0.1)
-    # scope_connection.rpc_command("get_camera_state")
-    # time.sleep(0.1)
-    # scope_connection.rpc_command("get_wheel_state")
-    # time.sleep(0.1)
-    # scope_connection.rpc_command("get_camera_info")
-    # time.sleep(0.1)
-    # scope_connection.rpc_command("pi_get_info")
-    # time.sleep(0.1)
-    # camera_connection.rpc_command("get_rtmp_config")
-    # time.sleep(0.1)
-    # scope_connection.rpc_command("scope_is_moving")
-    # time.sleep(0.1)
-    # scope_connection.rpc_command("get_setting")
-    # time.sleep(0.1)
-    # scope_connection.rpc_command("get_camera_exp_and_bin")
-    # time.sleep(0.1)
-    # scope_connection.rpc_command("get_control_value", params=["Exposure"])
+    if THIS_FILE_PATH.name == "indi_seestar_mount":
+        scope = SeestarScope("MySeestar")
+        scope.start()
+    elif THIS_FILE_PATH.name == "indi_seestar_ccd":
+        camera = SeestarCamera("MySeestar")
+        camera.start()
+    elif THIS_FILE_PATH.name == "indi_seestar_focuser":
+        focuser = SeestarFocuser("MySeestar")
+        focuser.start()
+    elif THIS_FILE_PATH.name == "indi_seestar_filterwheel":
+        filter_wheel = SeestarFilter("MySeestar")
+        filter_wheel.start()
+    else:
+        if "--set-time" in sys.argv:
+            scope_connection.rpc_command("pi_set_time",
+                                         params={"year": now.tm_year, "mon": now.tm_mon, "day": now.tm_mday,
+                                                 "hour": now.tm_hour, "min": now.tm_min, "sec": now.tm_sec,
+                                                 "time_zone": "Etc/UTC"})
+        # scope_connection.rpc_command("get_view_state")
+        # time.sleep(0.1)
+        scope_connection.rpc_command("get_device_state", params={"keys": ["device", "camera", "pi_status"]})
+        time.sleep(0.1)
+        # scope_connection.rpc_command("scope_get_ra_dec")
+        # time.sleep(0.1)
+        scope_connection.rpc_command("get_camera_state")
+        time.sleep(0.1)
+        scope_connection.rpc_command("get_wheel_state")
+        time.sleep(0.1)
+        scope_connection.rpc_command("get_camera_info")
+        time.sleep(0.1)
+        scope_connection.rpc_command("pi_get_info")
+        # time.sleep(0.1)
+        # camera_connection.rpc_command("get_rtmp_config")
+        # time.sleep(0.1)
+        # scope_connection.rpc_command("scope_is_moving")
+        time.sleep(0.1)
+        scope_connection.rpc_command("get_setting")
+        time.sleep(0.1)
+        scope_connection.rpc_command("get_camera_exp_and_bin")
+        # time.sleep(0.1)
+        # scope_connection.rpc_command("get_control_value", params=["Exposure"])
 
-    # scope = SeestarScope("MySeestar")
-    # scope.start()
-    # print(cam)
     # time.sleep(0.2)
     # print(cam["CCD_TEMPERATURE"].elements)
     # time.sleep(0.2)
