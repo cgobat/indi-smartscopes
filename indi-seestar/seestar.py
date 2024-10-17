@@ -7,13 +7,9 @@ from pathlib import Path
 from pyindi.device import (device as Device, INumberVector, ISwitchVector, ITextVector,
                            INumber, ISwitch, IText, IPerm, IPState, ISState, ISRule)
 sys.path.append(Path(__file__).parent.as_posix())
-from socket_connections import connections_by_port, RPCConnectionManager, ImageConnectionManager, LogConnectionManager
+from socket_connections import (connections_by_port, DEFAULT_ADDR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT,
+                                RPCConnectionManager, ImageConnectionManager, LogConnectionManager)
 
-
-CONTROL_PORT = 4700
-IMAGING_PORT = 4800
-LOGGING_PORT = 4801
-DEFAULT_ADDR = "seestar.local"
 
 logger = logging.getLogger(Path(__file__).stem)
 logging.basicConfig(force=True, level=logging.DEBUG,
