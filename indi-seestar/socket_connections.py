@@ -60,7 +60,7 @@ def listen_recv(address: str, port: int):
 def cleanup():
     global connections_by_port
     for addr, socket_dict in connections_by_port.items():
-        for port, sock in socket_dict:
+        for port, sock in socket_dict.items():
             try:
                 sock.close()
             except:
@@ -79,7 +79,7 @@ class BaseConnectionManager(abc.ABC):
         self.address = str(address).strip()
         self.port = int(port)
         self.request_fifo = CONFIG_DIR/f"fifo_{self.address}_{self.port}_input.json"
-        self.response_fifo = CONFIG_DIR/f"fifo_{self.address}_{self.port}_output.bin"
+        self.response_fifo = CONFIG_DIR/f"fifo_{self.address}_{self.port}_output.pipe"
     
     @property
     def destination(self) -> str:
