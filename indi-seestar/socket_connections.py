@@ -218,10 +218,11 @@ class RawConnectionManager(BaseConnectionManager):
             if not self.connected:
                 time.sleep(1)
                 continue
-            header_bytes = self.receive_bytes(80)
+            data_bytes = self.receive_bytes()
+            header_bytes = data_bytes[:80]
             if len(header_bytes) >= 20:
                 header = self.parse_header()
-                data = self.read_bytes(header["size"])
+                data = data_bytes[80:80+header["size"]]
                 if header["id"] == self.cmd_id:
                     self.raw_data = data
                 else:
