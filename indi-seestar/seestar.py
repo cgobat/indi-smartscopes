@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
 
-import os
 import sys
-import json
 import time
-import toml
-import struct
 import logging
-import threading
 from pathlib import Path
-from collections import defaultdict
-from astropy import units
-from astropy.coordinates import SkyCoord
 from pyindi.device import (device as Device, INumberVector, ISwitchVector, ITextVector,
                            INumber, ISwitch, IText, IPerm, IPState, ISState, ISRule)
 sys.path.append(Path(__file__).parent.as_posix())
