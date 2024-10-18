@@ -25,14 +25,20 @@ logger = logging.getLogger()
 connections_by_port = defaultdict(dict)
 
 
+def get_socket(address: str, port: int) -> socket.socket:
+    global connections_by_port
+    sock = connections_by_port[address].get(port)
+    if sock is None:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((address, port))
+        connections_by_port[address][port] = sock
+    return sock
+
 def listen_send(address: str, port: int):
     global connections_by_port
     input_fifo = CONFIG_DIR/f"fifo_{address}_{port}_input.json"
     os.mkfifo(input_fifo.as_posix())
-    sock = connections_by_port[address].get(port)
-    if sock is None:
-        sock = connections_by_port[address][port] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((address, port))
+    sock = get_socket(address, port)
     with input_fifo.open("rb") as fifo:
         buffer = b''
         while True:
@@ -51,7 +57,8 @@ def listen_send(address: str, port: int):
             except (socket.timeout, socket.error):
                 logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
                 sock.close()
-                sock = connections_by_port[address][port] = socket.create_connection((address, port))
+                connections_by_port[address].pop(port)
+                sock = get_socket(address, port)
             except:
                 logger.exception("Uncaught exception while reading from FIFO/sending to socket")
                 break
@@ -60,10 +67,7 @@ def listen_recv(address: str, port: int):
     global connections_by_port
     output_fifo = CONFIG_DIR/f"fifo_{address}_{port}_output.pipe"
     os.mkfifo(output_fifo.as_posix())
-    sock = connections_by_port[address].get(port)
-    if sock is None:
-        sock = connections_by_port[address][port] = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
-        sock.connect((address, port))
+    sock = get_socket(address, port)
     with output_fifo.open("wb") as fifo:
         while True:
             try:
@@ -75,7 +79,8 @@ def listen_recv(address: str, port: int):
             except (socket.timeout, socket.error):
                 logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
                 sock.close()
-                sock = connections_by_port[address][port] = socket.create_connection((address, port), timeout=5.)
+                connections_by_port[address].pop(port)
+                sock = get_socket(address, port)
             except:
                 logger.exception("Uncaught exception while reading from socket/writing to FIFO")
                 break
