@@ -117,21 +117,6 @@ class BaseConnectionManager(abc.ABC):
     def connected(self) -> bool:
         return self.request_fifo.exists() or self.response_fifo.exists()
 
-    def connect(self):
-        if self.request_fifo.exists() or self.response_fifo.exists():
-            logger.info(f"Socket connection to {self.address}:{self.port} already established")
-            self.connected = True
-        else:
-            self.connected = False
-        # try:
-        #     self.socket = socket.create_connection((self.address, self.port))
-        #     logger.debug(f"Established socket connection with {self.destination}")
-        #     self.connected = True
-        # except:
-        #     logger.exception(f"Error connecting to socket")
-        #     self.connected = False
-        return self.connected
-
     def disconnect(self):
         try:
             self.socket.close()
