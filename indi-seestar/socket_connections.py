@@ -28,10 +28,11 @@ connections_by_port = defaultdict(dict)
 def get_socket(address: str, port: int) -> socket.socket:
     global connections_by_port
     sock = connections_by_port[address].get(port)
-    if sock is None:
+    if sock is None or sock._closed:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((address, port))
         connections_by_port[address][port] = sock
+        logger.debug(f"Established new socket connection to {address}:{port}")
     return sock
 
 def listen_send(address: str, port: int):
@@ -57,7 +58,6 @@ def listen_send(address: str, port: int):
             except (socket.timeout, socket.error):
                 logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
                 sock.close()
-                connections_by_port[address].pop(port)
                 sock = get_socket(address, port)
             except:
                 logger.exception("Uncaught exception while reading from FIFO/sending to socket")
@@ -79,7 +79,6 @@ def listen_recv(address: str, port: int):
             except (socket.timeout, socket.error):
                 logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
                 sock.close()
-                connections_by_port[address].pop(port)
                 sock = get_socket(address, port)
             except:
                 logger.exception("Uncaught exception while reading from socket/writing to FIFO")
