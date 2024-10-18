@@ -16,6 +16,8 @@ IMAGING_PORT = 4800
 LOGGING_PORT = 4801
 DEFAULT_ADDR = "seestar.local"
 
+MSG_END = b'\r\n'
+
 CONFIG_DIR = Path.home()/".indi_seestar"
 CONFIG_DIR.mkdir(exist_ok=True)
 
@@ -29,36 +31,54 @@ def listen_send(address: str, port: int):
     os.mkfifo(input_fifo.as_posix())
     sock = connections_by_port[address].get(port)
     if sock is None:
-        sock = connections_by_port[address][port] = socket.create_connection((address, port))
-    while True:
-        try:
-            with input_fifo.open("rb") as fifo:
-                for line in fifo:
-                    logger.debug(f"Sending {len(line)}B to {address}:{port}")
-                    sock.sendall(line)
-        except (socket.timeout, socket.error):
-            logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
-            sock.close()
-            sock = connections_by_port[address][port] = socket.create_connection((address, port))
+        sock = connections_by_port[address][port] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((address, port))
+    with input_fifo.open("rb") as fifo:
+        buffer = b''
+        while True:
+            try:
+                chunk = fifo.read(1024)
+                if chunk:
+                    buffer += chunk
+                    while MSG_END in buffer:
+                        end = buffer.index(MSG_END)+len(MSG_END)
+                        msg = buffer[:end]
+                        buffer = buffer[end:]
+                        logger.debug(f"Sending {len(msg)}B to {address}:{port}")
+                        sock.sendall(msg)
+                else:
+                    time.sleep(0.1)
+            except (socket.timeout, socket.error):
+                logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
+                sock.close()
+                sock = connections_by_port[address][port] = socket.create_connection((address, port))
+            except:
+                logger.exception("Uncaught exception while reading from FIFO/sending to socket")
+                break
 
 def listen_recv(address: str, port: int):
     global connections_by_port
     output_fifo = CONFIG_DIR/f"fifo_{address}_{port}_output.pipe"
     os.mkfifo(output_fifo.as_posix())
-    sock: socket.socket = connections_by_port[address].get(port)
+    sock = connections_by_port[address].get(port)
     if sock is None:
-        sock = connections_by_port[address][port] = socket.create_connection((address, port))
-    while True:
-        try:
-            data = sock.recv(1024*64)
-            if data:
-                logger.debug(f"Got {len(data)}B from {address}:{port}")
-                with output_fifo.open("wb") as fifo:
+        sock = connections_by_port[address][port] = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+        sock.connect((address, port))
+    with output_fifo.open("wb") as fifo:
+        while True:
+            try:
+                data = sock.recv(1024)
+                if data:
+                    logger.debug(f"Received {len(data)}B from {address}:{port}")
                     fifo.write(data)
-        except (socket.timeout, socket.error):
-            logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
-            sock.close()
-            sock = connections_by_port[address][port] = socket.create_connection((address, port))
+                    fifo.flush()
+            except (socket.timeout, socket.error):
+                logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
+                sock.close()
+                sock = connections_by_port[address][port] = socket.create_connection((address, port), timeout=5.)
+            except:
+                logger.exception("Uncaught exception while reading from socket/writing to FIFO")
+                break
 
 def cleanup():
     global connections_by_port
@@ -126,6 +146,7 @@ class BaseConnectionManager(abc.ABC):
             json_str = json.dumps(data).encode()
             with self.request_fifo.open("wb") as fifo:
                 fifo.write(json_str+b'\r\n')
+                fifo.flush()
         except:
             logger.exception(f"Failed to write JSON to FIFO {self.request_fifo}")
 
@@ -163,15 +184,15 @@ class RPCConnectionManager(BaseConnectionManager):
         self.send_json(payload)
         self.cmd_id += 1
         return payload["id"]
-    
+
     @staticmethod
     def parse_json(data: "str|bytes") -> dict:
         return json.loads(data.strip())
-    
+
     def receive_loop(self):
         remaining = b''
-        while True:
-            with self.response_fifo.open("rb") as fifo:
+        with self.response_fifo.open("rb") as fifo:
+            while True:
                 for data in fifo:
                     remaining += data
                     first_idx = remaining.find(b'\r\n')
@@ -189,15 +210,14 @@ class RPCConnectionManager(BaseConnectionManager):
                             self.event_list.append(parsed)
                         else:
                             logger.warning("Got non-RPC and non-Event message!")
-                        logger.debug(f"Received message:\n{json.dumps(parsed, indent=2, sort_keys=False)}")
-            
-            time.sleep(1)
-    
+                        logger.debug(f"Read message:\n{json.dumps(parsed, indent=2, sort_keys=False)}")
+                time.sleep(0.1)
+
     def await_response(self, rpc_id: int):
         while rpc_id not in self.rpc_responses:
             time.sleep(0.01)
         return self.rpc_responses[rpc_id]
-    
+
     def send_cmd_and_await_response(self, command, **kwargs) -> dict:
         cmd_id = self.rpc_command(command, **kwargs)
         return self.await_response(cmd_id)
