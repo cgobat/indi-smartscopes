@@ -26,37 +26,33 @@ CONFIG_DIR = Path.home()/".indi_seestar"
 CONFIG_DIR.mkdir(exist_ok=True)
 
 logger = logging.getLogger()
-connections_by_port = defaultdict(dict)
+sockets_by_port = defaultdict(dict)
 lock_file_path = CONFIG_DIR/"seestar_socket_pid.lock"
 lock_fd = None
 
 def get_socket(address: str, port: int) -> socket.socket:
-    global connections_by_port
-    sock = connections_by_port[address].get(port)
+    global sockets_by_port
+    sock = sockets_by_port[address].get(port)
     if sock is None or sock._closed or sock.fileno() == -1:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(None)
         sock.connect((address, port))
-        connections_by_port[address][port] = sock
+        sockets_by_port[address][port] = sock
         logger.debug(f"Established new socket connection to {address}:{port}")
     return sock
 
 def cleanup():
-    global connections_by_port, lock_fd, lock_file_path
+    global sockets_by_port, lock_fd, lock_file_path
     if lock_fd is not None:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)
         os.close(lock_fd)
         lock_file_path.unlink(missing_ok=True)
-    for addr, socket_dict in connections_by_port.items():
+    for addr, socket_dict in sockets_by_port.items():
         for port, sock in socket_dict.items():
             try:
                 sock.close()
             except:
                 pass
-            finally:
-                for fifo in CONFIG_DIR.glob(f"fifo_{addr}_{port}*"):
-                    fifo.unlink()
-                logger.debug(f"Closed socket and FIFOs for {addr}:{port}")
 
 atexit.register(cleanup)
 

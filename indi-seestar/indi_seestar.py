@@ -8,7 +8,7 @@ from pathlib import Path
 from pyindi.device import (device as Device, INumberVector, ISwitchVector, ITextVector,
                            INumber, ISwitch, IText, IPerm, IPState, ISState, ISRule)
 sys.path.append(Path(__file__).parent.as_posix())
-from socket_connections import (connections_by_port, DEFAULT_ADDR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT,
+from socket_connections import (sockets_by_port, DEFAULT_ADDR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT,
                                 RPCConnectionManager, ImageConnectionManager, LogConnectionManager)
 
 THIS_FILE_PATH = Path(__file__) # leave symlinks as-is/unresolved
