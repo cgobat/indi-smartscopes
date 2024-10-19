@@ -2,6 +2,7 @@
 
 import sys
 import time
+import tzlocal
 import logging
 from pathlib import Path
 from pyindi.device import (device as Device, INumberVector, ISwitchVector, ITextVector,
@@ -358,7 +359,7 @@ if __name__ == "__main__":
     # initial_event = scope_connection.event_list[0]
     # t0 = float(initial_event["Timestamp"])
     # logger.debug(f"Initial event recorded at t={t0}")
-    now = time.gmtime()
+    now = time.localtime()
 
     if THIS_FILE_PATH.name == "indi_seestar_mount":
         scope = SeestarScope("MySeestar")
@@ -378,7 +379,8 @@ if __name__ == "__main__":
             scope_connection.rpc_command("pi_set_time",
                                          params={"year": now.tm_year, "mon": now.tm_mon, "day": now.tm_mday,
                                                  "hour": now.tm_hour, "min": now.tm_min, "sec": now.tm_sec,
-                                                 "time_zone": "Etc/UTC"})
+                                                 "time_zone": tzlocal.get_localzone_name()})
+            time.sleep(0.5)
         # scope_connection.rpc_command("get_view_state")
         time.sleep(1.0)
         scope_connection.rpc_command("get_device_state", params={"keys": ["device", "camera", "pi_status"]})
