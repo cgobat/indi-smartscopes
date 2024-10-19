@@ -20,7 +20,7 @@
     </devGroup>
     <devGroup group="Telescopes">
         <device label="INDI Seestar Mount" manufacturer="ZWO">
-            <driver name="INDI Seestar Mount">indi_seestar_mount</driver>
+            <driver name="INDI Seestar Mount">indi_seestar_scope</driver>
             <version>0.0.1</version>
         </device>
     </devGroup>

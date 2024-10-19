@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     driver_executable = SOURCE_DIR/"indi_seestar.py"
     driver_executable.chmod(driver_executable.stat().st_mode | 0o111) # ensure executability
-    for driver_name in ["indi_seestar_mount", "indi_seestar_focuser", "indi_seestar_ccd", "indi_seestar_filterwheel"]:
+    for driver_name in ["indi_seestar_scope", "indi_seestar_focuser", "indi_seestar_ccd", "indi_seestar_filterwheel"]:
         driver_destination = INDI_BIN_DIR/driver_name
         driver_destination.unlink(missing_ok=True)
         driver_destination.symlink_to(driver_executable)

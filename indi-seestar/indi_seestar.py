@@ -349,7 +349,7 @@ if __name__ == "__main__":
     # logger.debug(f"Initial event recorded at t={t0}")
     now = time.localtime()
 
-    if THIS_FILE_PATH.name == "indi_seestar_mount":
+    if THIS_FILE_PATH.name == "indi_seestar_scope":
         scope = SeestarScope("MySeestar")
         scope.start()
     elif THIS_FILE_PATH.name == "indi_seestar_ccd":
