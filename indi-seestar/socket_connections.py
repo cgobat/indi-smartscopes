@@ -15,6 +15,9 @@ import datetime as dt
 from pathlib import Path
 from collections import defaultdict
 
+logging.basicConfig(force=True, level=logging.DEBUG,
+                    format="[%(levelname)s] %(message)s")
+
 CONTROL_PORT = 4700
 IMAGING_PORT = 4800
 LOGGING_PORT = 4801
@@ -227,15 +230,17 @@ class RawConnectionManager(BaseConnectionManager):
                         struct.unpack(pack_fmt, data[:struct.calcsize(pack_fmt)])))
 
     def receive_loop(self):
+        poller = select.poll()
+        poller.register(self.socket, select.POLLIN)
         while self._do_listen:
-            if not self.connected:
-                time.sleep(1)
+            events = dict(poller.poll())
+            if not events:
+                time.sleep(0.2)
                 continue
-            data_bytes = self.receive_bytes()
-            header_bytes = data_bytes[:80]
+            header_bytes = self.socket.recv(80)
             if len(header_bytes) >= 20:
-                header = self.parse_header()
-                data = data_bytes[80:80+header["size"]]
+                header = self.parse_header(header_bytes)
+                data = self.socket.recv(header["size"])
                 if header["id"] == self.cmd_id:
                     self.raw_data = data
                 else:
@@ -245,6 +250,8 @@ class RawConnectionManager(BaseConnectionManager):
 
 
 class ImageConnectionManager(RawConnectionManager, RPCConnectionManager):
+
+    receive_loop = RawConnectionManager.receive_loop
 
     def request_image():
         ...
