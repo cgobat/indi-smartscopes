@@ -39,55 +39,6 @@ def get_socket(address: str, port: int) -> socket.socket:
         logger.debug(f"Established new socket connection to {address}:{port}")
     return sock
 
-def listen_send(address: str, port: int):
-    global connections_by_port
-    input_fifo = CONFIG_DIR/f"fifo_{address}_{port}_input.json"
-    os.mkfifo(input_fifo.as_posix())
-    sock = get_socket(address, port)
-    with input_fifo.open("rb") as fifo:
-        buffer = b''
-        while True:
-            try:
-                chunk = fifo.read(1024)
-                if chunk:
-                    buffer += chunk
-                    while MSG_END in buffer:
-                        end = buffer.index(MSG_END)+len(MSG_END)
-                        msg = buffer[:end]
-                        buffer = buffer[end:]
-                        logger.debug(f"Sending {len(msg)}B to {address}:{port}")
-                        sock.sendall(msg)
-                else:
-                    time.sleep(0.1)
-            except (socket.timeout, socket.error):
-                logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
-                sock.close()
-                sock = get_socket(address, port)
-            except:
-                logger.exception("Uncaught exception while reading from FIFO/sending to socket")
-                break
-
-def listen_recv(address: str, port: int):
-    global connections_by_port
-    output_fifo = CONFIG_DIR/f"fifo_{address}_{port}_output.pipe"
-    os.mkfifo(output_fifo.as_posix())
-    sock = get_socket(address, port)
-    with output_fifo.open("wb") as fifo:
-        while True:
-            try:
-                data = sock.recv(1024)
-                if data:
-                    logger.debug(f"Received {len(data)}B from {address}:{port}")
-                    fifo.write(data)
-                    fifo.flush()
-            except (socket.timeout, socket.error):
-                logger.error(f"Socket connection to {address}:{port} broken. Reconnecting.")
-                sock.close()
-                sock = get_socket(address, port)
-            except:
-                logger.exception("Uncaught exception while reading from socket/writing to FIFO")
-                break
-
 def cleanup():
     global connections_by_port, lock_fd, lock_file_path
     if lock_fd is not None:
