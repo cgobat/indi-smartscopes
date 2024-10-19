@@ -3,7 +3,9 @@ import os
 import abc
 import json
 import time
+import fcntl
 import atexit
+import select
 import socket
 import struct
 import logging
@@ -23,13 +25,15 @@ CONFIG_DIR.mkdir(exist_ok=True)
 
 logger = logging.getLogger()
 connections_by_port = defaultdict(dict)
-
+lock_file_path = CONFIG_DIR/"seestar_socket_pid.lock"
+lock_fd = None
 
 def get_socket(address: str, port: int) -> socket.socket:
     global connections_by_port
     sock = connections_by_port[address].get(port)
-    if sock is None or sock._closed:
+    if sock is None or sock._closed or sock.fileno() == -1:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(None)
         sock.connect((address, port))
         connections_by_port[address][port] = sock
         logger.debug(f"Established new socket connection to {address}:{port}")
@@ -85,7 +89,11 @@ def listen_recv(address: str, port: int):
                 break
 
 def cleanup():
-    global connections_by_port
+    global connections_by_port, lock_fd, lock_file_path
+    if lock_fd is not None:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+        lock_file_path.unlink(missing_ok=True)
     for addr, socket_dict in connections_by_port.items():
         for port, sock in socket_dict.items():
             try:
@@ -105,57 +113,71 @@ class BaseConnectionManager(abc.ABC):
     def __init__(self, address: str, port: int):
         self.address = str(address).strip()
         self.port = int(port)
-        self.request_fifo = CONFIG_DIR/f"fifo_{self.address}_{self.port}_input.json"
-        self.response_fifo = CONFIG_DIR/f"fifo_{self.address}_{self.port}_output.pipe"
+        self.socket = None
+        self.connected = False
     
     @property
     def destination(self) -> str:
         return f"{self.address}:{self.port}"
-    
-    @property
-    def socket(self) -> socket.socket:
-        global connections_by_port
-        return connections_by_port[self.address].get(self.port)
-    
-    @property
-    def connected(self) -> bool:
-        return self.request_fifo.exists() or self.response_fifo.exists()
+
+    def connect(self):
+        for i in range(3):
+            try:
+                self.socket = get_socket(self.address, self.port)
+                self.connected = True
+                break
+            except ConnectionError:
+                logger.warning(f"Error getting/connecting socket. {2-i} tries left.")
+                time.sleep(0.1)
+        else:
+            self.connected = False
+        if self.connected:
+            self.start_heartbeat()
 
     def disconnect(self):
         try:
             self.socket.close()
         except:
             pass
-        self.request_fifo.unlink()
-        self.response_fifo.unlink()
-        self.connected = False
+        self.connected = self._do_listen = self._do_heartbeat = False
     
     def send_json(self, data: dict):
         try:
             json_str = json.dumps(data).encode()
-            with self.request_fifo.open("wb") as fifo:
-                fifo.write(json_str+b'\r\n')
-                fifo.flush()
+            self.socket.sendall(json_str+b'\r\n')
         except:
-            logger.exception(f"Failed to write JSON to FIFO {self.request_fifo}")
-
-    def receive_bytes(self):
-        with self.response_fifo.open("rb") as fifo:
-            for line in fifo:
-                return line
-        return b''
+            logger.exception(f"Failed to send JSON to socket {self.socket}")
 
     def start_listening(self) -> threading.Thread:
+        if not self.connected:
+            self.connect()
         if not self.connected:
             logger.error("Socket not connected. Can't listen for messages.")
             return None
         thread = threading.Thread(target=self.receive_loop)
+        self._do_listen = True
         thread.start()
-        logger.debug(f"Started listening for messages at {self.response_fifo}")
+        logger.debug(f"Started listening on socket {self.socket}")
         return thread
+    
+    def stop_listening(self):
+        self._do_listen = False
+    
+    def start_heartbeat(self) -> threading.Thread:
+        thread = threading.Thread(target=self.heartbeat_loop)
+        self._do_heartbeat = True
+        thread.start()
+        return thread
+    
+    def stop_heartbeat(self):
+        self._do_heartbeat = False
     
     @abc.abstractmethod
     def receive_loop():
+        ...
+    
+    @abc.abstractmethod
+    def heartbeat_loop(self):
         ...
 
 
@@ -180,27 +202,40 @@ class RPCConnectionManager(BaseConnectionManager):
 
     def receive_loop(self):
         remaining = b''
-        with self.response_fifo.open("rb") as fifo:
-            while True:
-                for data in fifo:
-                    remaining += data
-                    first_idx = remaining.find(b'\r\n')
+        poller = select.poll()
+        poller.register(self.socket, select.POLLIN)
+        while self._do_listen:
+            events = dict(poller.poll())
+            if events:
+                data = self.socket.recv(1024*64)
+                remaining += data
 
-                    while first_idx >= 0:
-                        message = remaining[:first_idx]
-                        remaining = remaining[first_idx+2:]
-                        parsed = self.parse_json(message)
-                        first_idx = remaining.find(b'\r\n')
-                        if "jsonrpc" in parsed:
-                            self.rpc_responses[parsed["id"]] = parsed
-                            if parsed.get("code", 0):
-                                logger.warning(f"Got non-zero return code in response to RPC command '{parsed['method']}' (ID: {parsed['id']})")
-                        elif "Event" in parsed:
-                            self.event_list.append(parsed)
-                        else:
-                            logger.warning("Got non-RPC and non-Event message!")
-                        logger.debug(f"Read message:\n{json.dumps(parsed, indent=2, sort_keys=False)}")
-                time.sleep(0.1)
+                while MSG_END in remaining:
+                    message, *others = remaining.split(MSG_END)
+                    remaining = MSG_END.join(others)
+                    parsed = self.parse_json(message)
+                    if "jsonrpc" in parsed:
+                        self.rpc_responses[parsed["id"]] = parsed
+                        if parsed.get("code", 0):
+                            logger.warning(f"Got non-zero return code in response to RPC command '{parsed['method']}' (ID: {parsed['id']})")
+                    elif "Event" in parsed:
+                        self.event_list.append(parsed)
+                    else:
+                        logger.warning("Got non-RPC and non-Event message!")
+                    logger.debug(f"Read message:\n{json.dumps(parsed, indent=2, sort_keys=False)}")
+            else:
+                time.sleep(0.2)
+
+    def heartbeat_loop(self):
+        while self._do_heartbeat:
+            if not self.connected:
+                try:
+                    self.connect()
+                except:
+                    time.sleep(3)
+                    continue
+            self.rpc_command("test_connection", id="heartbeat")
+            time.sleep(3)
 
     def await_response(self, rpc_id: int):
         while rpc_id not in self.rpc_responses:
@@ -226,7 +261,7 @@ class RawConnectionManager(BaseConnectionManager):
                         struct.unpack(pack_fmt, data[:struct.calcsize(pack_fmt)])))
 
     def receive_loop(self):
-        while True:
+        while self._do_listen:
             if not self.connected:
                 time.sleep(1)
                 continue
@@ -265,14 +300,13 @@ class LogConnectionManager(RawConnectionManager):
         return self.raw_data
 
 # this block will be executed whenever this file is run or anything here is imported
-for port in (CONTROL_PORT, IMAGING_PORT, LOGGING_PORT):
-    input_fifo = CONFIG_DIR/f"fifo_{DEFAULT_ADDR}_{port}_input.json"
-    output_fifo = CONFIG_DIR/f"fifo_{DEFAULT_ADDR}_{port}_output.pipe"
-    if not input_fifo.exists():
-        in_thread = threading.Thread(target=listen_send, args=(DEFAULT_ADDR, port))
-        in_thread.start()
-        logger.info(f"{__file__} started listening for outgoing data from {DEFAULT_ADDR}:{port}")
-    if not output_fifo.exists():
-        out_thread = threading.Thread(target=listen_recv, args=(DEFAULT_ADDR, port))
-        out_thread.start()
-        logger.info(f"{__file__} started listening for incoming data from {DEFAULT_ADDR}:{port}")
+for port in (CONTROL_PORT,):# IMAGING_PORT, LOGGING_PORT):
+    lock_fd = os.open(lock_file_path, os.O_CREAT|os.O_RDWR)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
+        os.write(lock_fd, f"{os.getpid()}\n".encode())
+        # server_thread = threading.Thread(target=start_receiving)
+        # server_thread.start()
+    except BlockingIOError:
+        logger.error(f"Another process already has a lock on {lock_file_path}")
+        raise # for now

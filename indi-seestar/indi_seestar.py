@@ -200,7 +200,7 @@ class SeestarScope(Device):
 
 class SeestarCamera(Device):
     
-    def __init__(self, name=None, host="seestar.local"):
+    def __init__(self, name=None, host=DEFAULT_ADDR):
         super().__init__(name=name)
         global connections_by_port
         self.ctl_connection = connections_by_port[host].get(CONTROL_PORT)
@@ -348,17 +348,17 @@ if __name__ == "__main__":
 
     scope_connection = RPCConnectionManager(DEFAULT_ADDR, CONTROL_PORT)
     scope_connection.start_listening()
-    camera_connection = ImageConnectionManager(DEFAULT_ADDR, IMAGING_PORT)
-    camera_connection.start_listening()
-    log_connection = LogConnectionManager(DEFAULT_ADDR, LOGGING_PORT)
-    log_connection.start_listening()
+    # camera_connection = ImageConnectionManager(DEFAULT_ADDR, IMAGING_PORT)
+    # camera_connection.start_listening()
+    # log_connection = LogConnectionManager(DEFAULT_ADDR, LOGGING_PORT)
+    # log_connection.start_listening()
 
     # while not scope_connection.event_list:
     #     time.sleep(0.01)
     # initial_event = scope_connection.event_list[0]
     # t0 = float(initial_event["Timestamp"])
     # logger.debug(f"Initial event recorded at t={t0}")
-    # now = time.gmtime()
+    now = time.gmtime()
 
     if THIS_FILE_PATH.name == "indi_seestar_mount":
         scope = SeestarScope("MySeestar")
@@ -380,27 +380,27 @@ if __name__ == "__main__":
                                                  "hour": now.tm_hour, "min": now.tm_min, "sec": now.tm_sec,
                                                  "time_zone": "Etc/UTC"})
         # scope_connection.rpc_command("get_view_state")
-        # time.sleep(0.1)
+        time.sleep(1.0)
         scope_connection.rpc_command("get_device_state", params={"keys": ["device", "camera", "pi_status"]})
-        time.sleep(0.1)
+        time.sleep(0.5)
         # scope_connection.rpc_command("scope_get_ra_dec")
-        # time.sleep(0.1)
-        scope_connection.rpc_command("get_camera_state")
-        time.sleep(0.1)
+        # time.sleep(0.5)
+        # scope_connection.rpc_command("get_camera_state")
+        # time.sleep(0.5)
         scope_connection.rpc_command("get_wheel_state")
-        time.sleep(0.1)
+        time.sleep(0.5)
         scope_connection.rpc_command("get_camera_info")
-        time.sleep(0.1)
+        time.sleep(0.5)
         scope_connection.rpc_command("pi_get_info")
-        # time.sleep(0.1)
+        # time.sleep(0.5)
         # camera_connection.rpc_command("get_rtmp_config")
-        # time.sleep(0.1)
+        # time.sleep(0.5)
         # scope_connection.rpc_command("scope_is_moving")
-        time.sleep(0.1)
+        time.sleep(0.5)
         scope_connection.rpc_command("get_setting")
-        time.sleep(0.1)
-        scope_connection.rpc_command("get_camera_exp_and_bin")
-        # time.sleep(0.1)
+        # time.sleep(0.5)
+        # scope_connection.rpc_command("get_camera_exp_and_bin")
+        # time.sleep(0.5)
         # scope_connection.rpc_command("get_control_value", params=["Exposure"])
 
     # time.sleep(0.2)
