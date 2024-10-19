@@ -2,6 +2,7 @@
 import os
 import abc
 import json
+import pytz
 import time
 import fcntl
 import atexit
@@ -10,6 +11,7 @@ import socket
 import struct
 import logging
 import threading
+import datetime as dt
 from pathlib import Path
 from collections import defaultdict
 
@@ -146,6 +148,17 @@ class RPCConnectionManager(BaseConnectionManager):
         self.send_json(payload)
         self.cmd_id += 1
         return payload["id"]
+
+    def convert_timestamp(self, timestamp: "str|float"):
+        time_responses = [response for _, response in self.rpc_responses.items() if response["method"]=="pi_get_time"]
+        if time_responses:
+            most_recent = max(time_responses, key=lambda r: float(r["Timestamp"]))
+            tdict = most_recent["result"]
+            ref_time = dt.datetime(year=tdict["year"], month=tdict["mon"], day=tdict["day"], hour=tdict["hour"],
+                                   minute=tdict["min"], second=tdict["sec"], tzinfo=pytz.timezone(tdict["time_zone"]))
+            epoch = ref_time - dt.timedelta(seconds=float(most_recent["Timestamp"])) # time at Timestamp=0
+            return (epoch + dt.timedelta(seconds=float(timestamp))).astimezone(dt.timezone.utc)
+        return float(timestamp)
 
     @staticmethod
     def parse_json(data: "str|bytes") -> dict:
