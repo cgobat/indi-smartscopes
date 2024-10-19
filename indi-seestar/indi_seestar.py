@@ -31,10 +31,7 @@ class SeestarScope(Device):
             self.connection = RPCConnectionManager(host, CONTROL_PORT)
 
     def ISGetProperties(self, device=None):
-        """
-        Property definitions are generated
-        by initProperties and buildSkeleton. No
-        need to do it here. """
+        """Called when client or indiserver sends `getProperties`."""
 
         self.IDDef(INumberVector([INumber("RA", "%2.8f", 0, 24, 1, 0, label="RA"),
                                   INumber("DEC", "%2.8f", -90, 90, 1, -90, label="DEC")],
@@ -71,31 +68,28 @@ class SeestarScope(Device):
                    None)
 
     def ISNewText(self, device, name, values, names):
-        """
-        A text vector has been updated from 
-        the client. 
-        """
+        """A text vector has been updated from the client."""
+
         self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
         self.IUUpdate(device, name, values, names, Set=True)
 
     def ISNewNumber(self, device, name, values, names):
-        """
-        A number vector has been updated from the client.
-        """
+        """A number vector has been updated from the client."""
+
         self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
         
         if name == "EQUATORIAL_EOD_COORD":
             current = self["EQUATORIAL_EOD_COORD"]
             ra, dec = float(current['RA'].value), float(current['DEC'].value)
-            
+
             self.IDMessage(f"Current pointing: RA={ra}, Dec={dec}")
-            
-            for index, value in enumerate(values):
-                if value == 'RA':
-                    ra = names[index]
-                elif value == 'DEC':
-                    dec = names[index]
-                    
+
+            for name, value in zip(names, values):
+                if name == 'RA':
+                    ra = value
+                elif name == 'DEC':
+                    dec = value
+
             self.IDMessage(f"Requested RA/Dec: ({ra}, {dec})")
 
             switch = self['ON_COORD_SET']
@@ -109,19 +103,16 @@ class SeestarScope(Device):
                 # Sync requested
                 cmd = "scope_sync"
                 params = [ra, dec]
-            
+
             try:
                 response = self.connection.send_cmd_and_await_response(cmd, params=params)
                 self.IDMessage(f"Set RA/Dec to {(ra, dec)}")
-                
+
             except Exception as error:
                 self.IDMessage(f"Seestar command error: {error}")
-                
 
     def ISNewSwitch(self, device, name, values, names):
-        """
-        A switch has been updated from the client.
-        """
+        """A switch vector has been updated from the client."""
 
         try:
             self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
@@ -157,17 +148,14 @@ class SeestarScope(Device):
             self.IDMessage(f"Error updating {name} property: {error}")
             raise
             
-    @Device.repeat(2000)
+    @Device.repeat(2000) # ms
     def do_repeat(self):
-        """
-        This function is called every 2000.
-        """
+        """Tasks to repeat every other second."""
 
         self.IDMessage("Running repeat function")
         
         try:
-            cmd_id = self.connection.rpc_command("scope_get_equ_coord")
-            result = self.connection.await_response(cmd_id)["result"]
+            result = self.connection.send_cmd_and_await_response("scope_get_equ_coord")["result"]
             ra = result['ra']
             dec = result['dec']
             self.IUUpdate(self._devname, 'EQUATORIAL_EOD_COORD', [ra, dec], ['RA', 'DEC'], Set=True)

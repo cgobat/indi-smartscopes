@@ -100,7 +100,7 @@ class BaseConnectionManager(abc.ABC):
     def start_listening(self) -> threading.Thread:
         if not self.connected:
             self.connect()
-        if not self.connected:
+        if not self.connected: # still not connected even after trying
             logger.error("Socket not connected. Can't listen for messages.")
             return None
         thread = threading.Thread(target=self.receive_loop)
@@ -122,7 +122,7 @@ class BaseConnectionManager(abc.ABC):
         self._do_heartbeat = False
     
     @abc.abstractmethod
-    def receive_loop():
+    def receive_loop(self):
         ...
     
     @abc.abstractmethod
@@ -139,6 +139,8 @@ class RPCConnectionManager(BaseConnectionManager):
         self.event_list = []
 
     def rpc_command(self, command: str, **kwargs):
+        """Send `command` as a JSON RPC message with additional arguments specified by `kwargs`."""
+
         payload = {"id": self.cmd_id, "method": command}
         payload.update(kwargs)
         self.send_json(payload)
@@ -198,11 +200,15 @@ class RPCConnectionManager(BaseConnectionManager):
             time.sleep(3)
 
     def await_response(self, rpc_id: int):
+        """Wait until a response corresponding to `rpc_id` appears, then return it."""
+
         while rpc_id not in self.rpc_responses:
             time.sleep(0.01)
         return self.rpc_responses[rpc_id]
 
     def send_cmd_and_await_response(self, command, **kwargs) -> dict:
+        """Convenience function that chains `rpc_command()` with `await_response()` and returns the result."""
+
         cmd_id = self.rpc_command(command, **kwargs)
         return self.await_response(cmd_id)
 
