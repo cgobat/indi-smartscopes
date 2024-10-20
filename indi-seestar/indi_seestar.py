@@ -13,7 +13,7 @@ from pyindi.device import (device as IDevice, INumberVector, ISwitchVector, ITex
 THIS_FILE_PATH = Path(__file__) # leave symlinks as-is/unresolved
 sys.path.append(THIS_FILE_PATH.resolve().parent.as_posix()) # resolve source directory
 
-from socket_connections import (DEFAULT_ADDR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT,
+from socket_connections import (DEFAULT_ADDR, CONFIG_DIR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT,
                                 RPCConnectionManager, ImageConnectionManager, LogConnectionManager)
 
 
@@ -340,13 +340,6 @@ class SeestarFilter(SeestarCommon):
 
 if __name__ == "__main__":
 
-    scope_connection = get_connection_manager(DEFAULT_ADDR, CONTROL_PORT, "rpc")
-    scope_connection.start_listening()
-    # camera_connection = get_connection_manager(DEFAULT_ADDR, IMAGING_PORT, "img")
-    # camera_connection.start_listening()
-    # log_connection = get_connection_manager(DEFAULT_ADDR, LOGGING_PORT, "log")
-    # log_connection.start_listening()
-
     # while not scope_connection.event_list:
     #     time.sleep(0.01)
     # initial_event = scope_connection.event_list[0]
@@ -367,12 +360,23 @@ if __name__ == "__main__":
         filter_wheel = SeestarFilter("MySeestar")
         filter_wheel.start()
     else:
+        scope_connection: RPCConnectionManager = get_connection_manager(DEFAULT_ADDR, CONTROL_PORT, "rpc")
+        scope_connection.start_listening()
+        camera_connection: ImageConnectionManager = get_connection_manager(DEFAULT_ADDR, IMAGING_PORT, "img")
+        camera_connection.start_listening()
+
         if "--set-time" in sys.argv:
             logger.info(f"Setting Seestar time to {now}")
             scope_connection.rpc_command("pi_set_time",
                                          params={"year": now.tm_year, "mon": now.tm_mon, "day": now.tm_mday,
                                                  "hour": now.tm_hour, "min": now.tm_min, "sec": now.tm_sec,
                                                  "time_zone": tzlocal.get_localzone_name()})
+            time.sleep(0.5)
+        if "--get-log" in sys.argv:
+            log_connection: LogConnectionManager = get_connection_manager(DEFAULT_ADDR, LOGGING_PORT, "log")
+            zip_data = log_connection.get_log_dump()
+            with (CONFIG_DIR/"seestar_svr_log.zip").open("wb+") as zipfile:
+                zipfile.write(zip_data)
             time.sleep(0.5)
         # scope_connection.rpc_command("get_view_state")
         time.sleep(1.0)

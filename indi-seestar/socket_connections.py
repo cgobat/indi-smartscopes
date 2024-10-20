@@ -246,15 +246,31 @@ class RawConnectionManager(BaseConnectionManager):
                 time.sleep(0.2)
                 continue
             header_bytes = self.socket.recv(80)
-            if len(header_bytes) >= 20:
+            if len(header_bytes) >= 20 and header_bytes.startswith(b'\x03\xc3\x00\x02'):
                 header = self.parse_header(header_bytes)
                 data = self.socket.recv(header["size"])
-                if header["id"] == self.cmd_id:
-                    self.raw_data = data
-                else:
-                    logger.warning(f"Message ID {header['id']} is out of sync with current command ID {self.cmd_id}")
+                logger.debug(f"Received {len(data)}B message ({header=})")
+                if header["id"] == 2: # heartbeat/connection confirmation
+                    continue
+                while len(data) < header["size"]:
+                    data += self.socket.recv(header["size"]-len(self.raw_data))
+                    logger.debug(f"Raw data now has {len(data)} bytes")
+                self.raw_data = data
             elif header_bytes:
-                logger.warning(f"Received less than 20B: {header_bytes}")
+                remaining = self.socket.recv(1024*64)
+                data = header_bytes + remaining
+                logger.warning(f"Received {len(data)}B non-header message: {data[:20]}...")
+    
+    def heartbeat_loop(self):
+        while self._do_heartbeat:
+            if not self.connected:
+                try:
+                    self.connect()
+                except:
+                    time.sleep(3)
+                    continue
+            self.send_json({"method": "test_connection", "id": 2})
+            time.sleep(3)
 
 
 class ImageConnectionManager(RawConnectionManager, RPCConnectionManager):
@@ -267,13 +283,9 @@ class ImageConnectionManager(RawConnectionManager, RPCConnectionManager):
 
 class LogConnectionManager(RawConnectionManager):
 
-    def request_log(self):
-        self.send_json({"id": self.cmd_id+1, "method": "get_server_log"})
-        self.cmd_id += 1
-
-    def get_log_single(self):
+    def get_log_dump(self):
         self.start_listening()
-        self.request_log()
+        self.send_json({"id": 44, "method": "get_server_log"})
         while not self.raw_data:
             logger.debug("Waiting for log message...")
             time.sleep(2)
