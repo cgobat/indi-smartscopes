@@ -90,7 +90,7 @@ class SeestarScope(SeestarCommon):
                    None)
         
         status = self.connection.send_cmd_and_await_response("get_device_state",
-                                                             params={"keys": ["device", "setting", "pi_status"]})
+                                                             params={"keys": ["device", "setting", "pi_status", "mount"]})
         device = status["result"]["device"]
         self.IDDef(INumberVector([INumber("TELESCOPE_APERTURE", format="%f", min=0, max=10000, step=1,
                                           value=device["focal_len"]/device["fnumber"], label="Aperture (mm)"),
@@ -99,9 +99,26 @@ class SeestarScope(SeestarCommon):
                                  self._devname, "TELESCOPE_INFO", IPState.IDLE, IPerm.RO, label="Optical Properties"),
                    None)
 
-        self.IDDef(ISwitchVector([ISwitch("DEW_HEATER_ENABLED", ISState.ON if status["result"]["setting"]["heater_enable"] else ISState.OFF),
-                                  ISwitch("DEW_HEATER_DISABLED", ISState.OFF if status["result"]["setting"]["heater_enable"] else ISState.ON)],
-                                 self._devname, "DEW_HEATER", state=IPState.OK, rule=ISRule.ONEOFMANY, perm=IPerm.RW, label="Dew Heater Enable"),
+        self.IDDef(ISwitchVector([ISwitch("DEW_HEATER_ENABLED",
+                                          ISState.ON if status["result"]["setting"]["heater_enable"] else ISState.OFF),
+                                  ISwitch("DEW_HEATER_DISABLED",
+                                          ISState.OFF if status["result"]["setting"]["heater_enable"] else ISState.ON)],
+                                 self._devname, "DEW_HEATER", state=IPState.OK, rule=ISRule.ONEOFMANY, perm=IPerm.RW,
+                                 label="Dew Heater Enable"),
+                   None)
+        
+        self.IDDef(ISwitchVector([ISwitch("PARK",
+                                          ISState.ON if status["result"]["mount"]["close"] else ISState.OFF),
+                                  ISwitch("UNPARK",
+                                          ISState.OFF if status["result"]["mount"]["close"] else ISState.ON)],
+                                 self._devname, "TELESCOPE_PARK", state=IPState.IDLE, rule=ISRule.ONEOFMANY,
+                                 perm=IPerm.RW, label="Raise/Lower Arm"),
+                   None)
+        
+        self.IDDef(ISwitchVector([ISwitch("PIER_EAST", ISState.OFF),
+                                  ISwitch("PIER_WEST", ISState.OFF)],
+                                 self._devname, "TELESCOPE_PIER_SIDE", state=IPState.IDLE,
+                                 rule=ISRule.ATMOST1, perm=IPerm.RO, label="Mount Pier Side"),
                    None)
 
     def ISNewText(self, device, name, values, names):
@@ -162,6 +179,14 @@ class SeestarScope(SeestarCommon):
                 if keyvals["ABORT_MOTION"] == ISState.ON:
                     self.connection.rpc_command("scope_abort_slew")
 
+            elif name == "TELESCOPE_PARK":
+                for name, value in zip(names, values):
+                    if value == ISState.ON:
+                        if name == "UNPARK":
+                            self.unpark()
+                        elif name == "PARK":
+                            self.park()
+
             elif name == "DEW_HEATER":
                 heater = self.IUUpdate(device, name, values, names)
                 if heater["DEW_HEATER_DISABLED"] == ISState.ON:
@@ -193,9 +218,7 @@ class SeestarScope(SeestarCommon):
             self.IDMessage(f"Seestar communication error: {error}")
 
     def goToInProgress(self):
-        """
-        Return true if a GoTo is in progress, false otherwise
-        """
+        """Return true if a GoTo is in progress, false otherwise"""
         
         try:
             result = self.connection.send_cmd_and_await_response("get_view_state")["result"]
@@ -205,15 +228,29 @@ class SeestarScope(SeestarCommon):
             self.IDMessage(f"Seestar communication error: {error}")
         
     def terminateGoTo(self):
-        """
-        Terminates current GoTo operation
-        """
+        """Terminates current GoTo operation"""
         
         try:
             self.connection.rpc_command("iscope_stop_view", params={"stage": "AutoGoto"})
         
         except Exception as error:
             self.IDMessage(f"Error terminating GoTo: {error}")
+
+    def park(self):
+        self.connection.rpc_command("scope_park")
+        self.IUUpdate(self._devname, "TELESCOPE_PARK", [ISState.ON, ISState.OFF], ["PARK", "UNPARK"], Set=True)
+
+    def unpark(self):
+        if self["TELESCOPE_PARK"]["PARK"].value == ISState.ON: # if currently parked
+            self.connection.rpc_command("scope_move_to_horizon")
+        else:
+            logger.info("Seestar is already unparked.")
+        self.IUUpdate(self._devname, "TELESCOPE_PARK", [ISState.OFF, ISState.ON], ["PARK", "UNPARK"], Set=True)
+
+    def rotate_cw_by_angle(self, angle: int):
+        """Rotate the telescope by `angle` degrees clockwise around the azimuth axis.
+        Use negative values to turn counter-clockwise."""
+        self.connection.rpc_command("scope_move_left_by_angle", params=[angle]) # even though it says left, positive numbers move it right (clockwise)
 
 
 class SeestarCamera(SeestarCommon):
