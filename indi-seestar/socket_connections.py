@@ -139,7 +139,7 @@ class RPCConnectionManager(BaseConnectionManager):
         super().__init__(*args, **kwargs)
         self.cmd_id = 100
         self.rpc_responses = {}
-        self.event_list = []
+        self.event_states = {}
 
     def rpc_command(self, command: str, **kwargs):
         """Send `command` as a JSON RPC message with additional arguments specified by `kwargs`."""
@@ -184,7 +184,15 @@ class RPCConnectionManager(BaseConnectionManager):
                         if parsed.get("code", 0):
                             logger.warning(f"Got non-zero return code in response to RPC command '{parsed['method']}' (ID: {parsed['id']})")
                     elif "Event" in parsed:
-                        self.event_list.append(parsed)
+                        event_name = parsed["Event"]
+                        if parsed["Event"] == "PiStatus":
+                            if "temp" in parsed:
+                                event_name += "_temperature"
+                            elif "battery_capacity" in parsed:
+                                event_name += "_battery"
+                            else:
+                                event_name += "_other"
+                        self.event_states[event_name] = parsed
                     else:
                         logger.warning("Got non-RPC and non-Event message!")
                     logger.debug(f"Read message:\n{json.dumps(parsed, indent=2, sort_keys=False)}")
