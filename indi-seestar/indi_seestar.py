@@ -6,16 +6,20 @@ import tzlocal
 import logging
 from pathlib import Path
 from collections import defaultdict
-from pyindi.device import (device as Device, INumberVector, ISwitchVector, ITextVector,
+
+from pyindi.device import (device as IDevice, INumberVector, ISwitchVector, ITextVector,
                            INumber, ISwitch, IText, IPerm, IPState, ISState, ISRule)
-sys.path.append(Path(__file__).parent.as_posix())
+
+THIS_FILE_PATH = Path(__file__) # leave symlinks as-is/unresolved
+sys.path.append(THIS_FILE_PATH.resolve().parent.as_posix()) # resolve source directory
+
 from socket_connections import (DEFAULT_ADDR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT,
                                 RPCConnectionManager, ImageConnectionManager, LogConnectionManager)
 
-THIS_FILE_PATH = Path(__file__) # leave symlinks as-is/unresolved
 
-logger = logging.getLogger(Path(__file__).stem)
+logger = logging.getLogger(THIS_FILE_PATH.stem)
 connection_managers = defaultdict(dict)
+
 
 def get_connection_manager(address: str, port: int, kind: str):
     global connection_managers
@@ -26,28 +30,56 @@ def get_connection_manager(address: str, port: int, kind: str):
         cm = connection_managers[address][port] = cls(address, port)
     return cm
 
-class SeestarScope(Device):
+
+class SeestarCommon(IDevice):
 
     def __init__(self, name=None, host=DEFAULT_ADDR):
-        """
-        Construct device with name and number
-        """
         super().__init__(name=name)
         self.connection: RPCConnectionManager = get_connection_manager(host, CONTROL_PORT, "rpc")
 
     def ISGetProperties(self, device=None):
-        """Called when client or indiserver sends `getProperties`."""
-
-        self.IDDef(INumberVector([INumber("RA", "%2.8f", 0, 24, 1, 0, label="RA"),
-                                  INumber("DEC", "%2.8f", -90, 90, 1, -90, label="DEC")],
-                                 self._devname, "EQUATORIAL_EOD_COORD", IPState.OK, IPerm.RW,
-                                 label="Pointing Coordinates"),
-                   None)
 
         self.IDDef(ISwitchVector([ISwitch("CONNECT", ISState.OFF, "Connect"),
                                   ISwitch("DISCONNECT", ISState.ON, "Disconnect")],
                                  self._devname, "CONNECTION", IPState.IDLE, ISRule.ONEOFMANY,
                                  IPerm.RW, label="Connection"),
+                   None)
+    
+    def handle_connection_update(self, devname, actions: "list[str]", states: "list[ISState]"):
+        conn = self.IUUpdate(devname, "CONNECTION", states, actions)
+        if conn["DISCONNECT"].value == ISState.ON:
+            self.connection.disconnect() # also stops listening and heartbeat
+            conn.state = IPState.IDLE
+        elif conn["CONNECT"].value == ISState.ON:
+            self.connection.connect() # automatically starts heartbeat
+            self.connection.start_listening()
+            conn.state = IPState.OK
+
+        self.IDSet(conn)
+
+
+class SeestarScope(SeestarCommon):
+
+    def __init__(self, name=None, host=DEFAULT_ADDR):
+        super().__init__(name, host)
+
+    def ISGetProperties(self, device=None):
+        """Called when client or indiserver sends `getProperties`."""
+
+        get_time = self.connection.send_cmd_and_await_response("pi_get_time")
+        utc_time = self.connection.convert_timestamp(get_time["Timestamp"])
+
+        self.IDDef(ITextVector([IText("UTC", utc_time.replace(tzinfo=None).isoformat()),
+                                IText("OFFSET", "+0000")],
+                               self._devname, "TIME_UTC", IPState.IDLE, IPerm.RW, timeout=1),
+                   None)
+
+        pointing = self.connection.send_cmd_and_await_response("scope_get_equ_coord")
+
+        self.IDDef(INumberVector([INumber("RA", "%2.8f", 0, 24, 1, pointing["result"]["ra"], label="RA"),
+                                  INumber("DEC", "%2.8f", -90, 90, 1, pointing["result"]["dec"], label="Dec")],
+                                 self._devname, "EQUATORIAL_EOD_COORD", IPState.OK, IPerm.RW,
+                                 label="Pointing Coordinates"),
                    None)
 
         self.IDDef(ISwitchVector([ISwitch("SLEW", ISState.ON, "Slew"),
@@ -123,15 +155,7 @@ class SeestarScope(Device):
             self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
 
             if name == "CONNECTION":
-                conn = self.IUUpdate(device, name, values, names)
-                if conn["DISCONNECT"].value == ISState.ON:
-                    self.connection.disconnect()
-                    conn.state = IPState.IDLE
-                elif conn["CONNECT"].value == ISState.ON:
-                    self.connection.connect()
-                    conn.state = IPState.OK
-
-                self.IDSet(conn)
+                self.handle_connection_update(device, names, values)
 
             elif name == "TELESCOPE_ABORT_MOTION":
                 keyvals = dict(zip(names, values))
@@ -153,7 +177,7 @@ class SeestarScope(Device):
             self.IDMessage(f"Error updating {name} property: {error}")
             raise
             
-    @Device.repeat(2000) # ms
+    @IDevice.repeat(2000) # ms
     def do_repeat(self):
         """Tasks to repeat every other second."""
 
@@ -192,23 +216,21 @@ class SeestarScope(Device):
             self.IDMessage(f"Error terminating GoTo: {error}")
 
 
-class SeestarCamera(Device):
+class SeestarCamera(SeestarCommon):
     
     def __init__(self, name=None, host=DEFAULT_ADDR):
-        super().__init__(name=name)
-        self.rpc_connection: RPCConnectionManager = get_connection_manager(host, CONTROL_PORT, "rpc")
-        self.img_connection: ImageConnectionManager = get_connection_manager(host, IMAGING_PORT, "img")
+        super().__init__(name=name, host=host)
+        self.image_connection: ImageConnectionManager = get_connection_manager(host, IMAGING_PORT, "img")
 
     def ISGetProperties(self, device=None):
+        super().ISGetProperties(device)
 
-        cmd_id = self.rpc_connection.rpc_command("get_controls")
-        control_defs = self.rpc_connection.await_response(cmd_id)["result"]
+        control_defs = self.connection.send_cmd_and_await_response("get_controls")["result"]
         cam_controls = []
         for control in control_defs:
             if control["name"].startswith("ISP_"):
                 continue # skip ISP controls
-            cmd_id = self.rpc_connection.rpc_command("get_control_value", params=[control["name"]])
-            response = self.rpc_connection.await_response(cmd_id)
+            response = self.connection.send_cmd_and_await_response("get_control_value", params=[control["name"]])
             try:
                 current_value = response["result"]["value"]
             except KeyError:
@@ -224,15 +246,14 @@ class SeestarCamera(Device):
                              1, current_value, label=control["name"])
             cam_controls.append(number)
 
-
-        self.IDDef(INumberVector([temperature], self._devname, "CCD_TEMPERATURE", IPState.OK, IPerm.RO, label="Camera Temperature"),
+        self.IDDef(INumberVector([temperature], self._devname, "CCD_TEMPERATURE", IPState.IDLE, IPerm.RO, label="Camera Temperature"),
                    None)
-        
+
         self.IDDef(INumberVector(cam_controls, self._devname, "CCD_CONTROLS", IPState.OK, IPerm.RW, label="Camera Controls"),
                    None)
-        
-        cmd_id = self.rpc_connection.rpc_command("get_camera_info")
-        cam_info = self.rpc_connection.await_response(cmd_id)["result"]
+
+        cam_info = self.connection.send_cmd_and_await_response("get_camera_info")["result"]
+
         self.IDDef(INumberVector([INumber("CCD_MAX_X", format="%d", min=0, max=None, step=1, value=cam_info["chip_size"][0]),
                                   INumber("CCD_MAX_Y", format="%d", min=0, max=None, step=1, value=cam_info["chip_size"][1]),
                                   INumber("CCD_PIXEL_SIZE", format="%f", min=0, max=None, step=1, value=cam_info["pixel_size_um"]),
@@ -241,7 +262,7 @@ class SeestarCamera(Device):
                                   INumber("CCD_BITSPERPIXEL", format="%d", min=0, max=32, step=4, value=16)],
                                  self._devname, "CCD_INFO", IPState.IDLE, IPerm.RO, label="Camera Properties"),
                    None)
-        
+
         self.IDDef(ITextVector([IText("CFA_OFFSET_X", "0", "Bayer pattern X offset"),
                                 IText("CFA_OFFSET_Y", "0", "Bayer pattern Y offset"),
                                 IText("CFA_TYPE", "GRBG", "Bayer pattern order")], # TODO: read from 'debayer_pattern' instead of hardcoding
@@ -253,7 +274,7 @@ class SeestarCamera(Device):
                                  self._devname, "CONNECTION", IPState.IDLE, ISRule.ONEOFMANY,
                                  IPerm.RW, label="Connection"),
                    None)
-    
+
     def ISNewText(self, device, name, values, names):
         """
         A text vector has been updated from 
@@ -272,9 +293,9 @@ class SeestarCamera(Device):
             self.IDMessage(f"Initiating {values[0]} sec exposure")
             
             try:
-                self.rpc_connection.rpc_command("start_exposure", params={})
+                self.connection.rpc_command("start_exposure", params={})
                 time.sleep(values[0])
-                self.rpc_connection.rpc_command("stop_exposure")
+                self.connection.rpc_command("stop_exposure")
                 
             except Exception as error:
                 self.IDMessage(f"Seestar command error: {error}")
@@ -289,47 +310,31 @@ class SeestarCamera(Device):
 
         try:
             if name == "CONNECTION":
-                try:
-                    conn = self.IUUpdate(device, name, values, names)
-                    if conn["DISCONNECT"].value == ISState.ON:
-                        # self.rpc_connection.rpc_command("close_camera")
-                        self.rpc_connection.disconnect()
-                        self.img_connection.disconnect()
-                        conn.state = IPState.IDLE
-                    elif conn["CONNECT"].value == ISState.ON:
-                        self.rpc_connection.connect()
-                        # self.rpc_connection.rpc_command("open_camera")
-                        conn.state = IPState.OK
-
-                    self.IDSet(conn)
-
-                except Exception as error:
-                    self.IDMessage(f"Error updating CONNECTION property: {error}")
-                    raise
+                self.handle_connection_update(device, names, values)
             else:
                 prop = self.IUUpdate(device, name, values, names, Set=True)
 
         except Exception as error:
             self.IDMessage(f"Error updating {name} property: {error}")
     
-    @Device.repeat(2000)
+    @IDevice.repeat(2000)
     def do_repeat(self):
         
         self.IDMessage("Running camera loop")
 
         try:
-            result = self.rpc_connection.send_cmd_and_await_response("get_control_value", params=["Temperature"])["result"]
+            result = self.connection.send_cmd_and_await_response("get_control_value", params=["Temperature"])["result"]
             self.IUUpdate(self._devname, 'CCD_TEMPERATURE', [result["value"]], ["CCD_TEMPERATURE_VALUE"], Set=True)
             
         except Exception as error:
             self.IDMessage(f"Seestar communication error: {error}")
 
 
-class SeestarFocuser(Device):
+class SeestarFocuser(SeestarCommon):
     ...
 
 
-class SeestarFilter(Device):
+class SeestarFilter(SeestarCommon):
     ...
 
 
