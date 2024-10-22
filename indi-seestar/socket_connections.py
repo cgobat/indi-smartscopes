@@ -90,10 +90,13 @@ class BaseConnectionManager(abc.ABC):
         try:
             self.socket.close()
         except:
-            pass
+            pass # hope for the best...
         self.connected = self._do_listen = self._do_heartbeat = False
     
     def send_json(self, data: dict):
+        if not self.connected:
+            logger.error("Socket not connected. Can't send JSON.")
+            return
         try:
             json_str = json.dumps(data).encode()
             self.socket.sendall(json_str+b'\r\n')
@@ -139,7 +142,7 @@ class RPCConnectionManager(BaseConnectionManager):
         super().__init__(*args, **kwargs)
         self.cmd_id = 100
         self.rpc_responses = {}
-        self.event_states = {}
+        self.event_states = defaultdict(lambda : None)
 
     def rpc_command(self, command: str, **kwargs):
         """Send `command` as a JSON RPC message with additional arguments specified by `kwargs`."""
@@ -195,7 +198,8 @@ class RPCConnectionManager(BaseConnectionManager):
                         self.event_states[event_name] = parsed
                     else:
                         logger.warning("Got non-RPC and non-Event message!")
-                    logger.debug(f"Read message:\n{json.dumps(parsed, indent=2, sort_keys=False)}")
+                    logger.debug(f"Read message from {':'.join(map(str, self.socket.getpeername()))}:"
+                                 f"\n{json.dumps(parsed, indent=2, sort_keys=False)}")
             else:
                 time.sleep(0.2)
 
@@ -233,7 +237,7 @@ class RawConnectionManager(BaseConnectionManager):
 
     @staticmethod
     def parse_header(data: bytes):
-        pack_fmt = ">HHHIHHBBHH"
+        pack_fmt = ">HHHIHHBBHH" # H=u2, I=u4, B=u1
         return dict(zip(["s1", "s2", "s3", "size", "s5", "s6", "code", "id", "width", "height"],
                         struct.unpack(pack_fmt, data[:struct.calcsize(pack_fmt)])))
 
