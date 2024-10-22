@@ -4,6 +4,7 @@ import sys
 import time
 import tzlocal
 import logging
+import datetime as dt
 from pathlib import Path
 from collections import defaultdict
 
@@ -37,14 +38,46 @@ class SeestarCommon(IDevice):
         super().__init__(name=name)
         self.connection: RPCConnectionManager = get_connection_manager(host, CONTROL_PORT, "rpc")
 
+    @property
+    def connected(self) -> bool:
+        return self.connection.connected
+
     def ISGetProperties(self, device=None):
+        """Called when client or indiserver sends `getProperties`."""
 
         self.IDDef(ISwitchVector([ISwitch("CONNECT", ISState.OFF, "Connect"),
                                   ISwitch("DISCONNECT", ISState.ON, "Disconnect")],
                                  self._devname, "CONNECTION", IPState.IDLE, ISRule.ONEOFMANY,
                                  IPerm.RW, label="Connection"),
                    None)
-    
+
+        utc_now = dt.datetime.now().astimezone(dt.timezone.utc)
+        self.IDDef(ITextVector([IText("UTC", utc_now.strftime("%Y-%m-%dT%H:%M:%S.%f")),
+                                IText("OFFSET", "+0000")],
+                               self._devname, "TIME_UTC", IPState.IDLE, IPerm.RW, timeout=1),
+                   None)
+
+    def ISNewNumber(self, device, name, values, names):
+        """A numeric vector has been updated from the client."""
+
+        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
+        vec = self.IUUpdate(device, name, values, names, Set=True)
+
+    def ISNewSwitch(self, device, name, values, names):
+        """A switch vector has been updated from the client."""
+
+        if name == "CONNECTION":
+            self.handle_connection_update(device, names, values)
+        else:
+            self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
+            vec = self.IUUpdate(device, name, values, names, Set=True)
+
+    def ISNewText(self, device, name, values, names):
+        """A text vector has been updated from the client."""
+
+        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
+        self.IUUpdate(device, name, values, names, Set=True)
+
     def handle_connection_update(self, devname, actions: "list[str]", states: "list[ISState]"):
         conn = self.IUUpdate(devname, "CONNECTION", states, actions)
         if conn["DISCONNECT"].value == ISState.ON:
@@ -54,8 +87,12 @@ class SeestarCommon(IDevice):
             self.connection.connect() # automatically starts heartbeat
             self.connection.start_listening()
             conn.state = IPState.OK
+            self.on_connect()
 
         self.IDSet(conn)
+
+    def on_connect(self):
+        ...
 
 
 class SeestarScope(SeestarCommon):
@@ -64,20 +101,9 @@ class SeestarScope(SeestarCommon):
         super().__init__(name, host)
 
     def ISGetProperties(self, device=None):
-        """Called when client or indiserver sends `getProperties`."""
 
-        get_time = self.connection.send_cmd_and_await_response("pi_get_time")
-        utc_time = self.connection.convert_timestamp(get_time["Timestamp"])
-
-        self.IDDef(ITextVector([IText("UTC", utc_time.replace(tzinfo=None).isoformat()),
-                                IText("OFFSET", "+0000")],
-                               self._devname, "TIME_UTC", IPState.IDLE, IPerm.RW, timeout=1),
-                   None)
-
-        pointing = self.connection.send_cmd_and_await_response("scope_get_equ_coord")
-
-        self.IDDef(INumberVector([INumber("RA", "%2.8f", 0, 24, 1, pointing["result"]["ra"], label="RA"),
-                                  INumber("DEC", "%2.8f", -90, 90, 1, pointing["result"]["dec"], label="Dec")],
+        self.IDDef(INumberVector([INumber("RA", "%2.8f", 0, 24, 1, 0.0, label="RA"),
+                                  INumber("DEC", "%2.8f", -90, 90, 1, 0.0, label="Dec")],
                                  self._devname, "EQUATORIAL_EOD_COORD", IPState.OK, IPerm.RW,
                                  label="Pointing Coordinates"),
                    None)
@@ -89,28 +115,22 @@ class SeestarScope(SeestarCommon):
                                  IPerm.RW, label="On coord set"),
                    None)
         
-        status = self.connection.send_cmd_and_await_response("get_device_state",
-                                                             params={"keys": ["device", "setting", "pi_status", "mount"]})
-        device = status["result"]["device"]
+        optics = {"focal_len": 250.0, "fnumber": 5.0}
         self.IDDef(INumberVector([INumber("TELESCOPE_APERTURE", format="%f", min=0, max=10000, step=1,
-                                          value=device["focal_len"]/device["fnumber"], label="Aperture (mm)"),
+                                          value=optics["focal_len"]/optics["fnumber"], label="Aperture (mm)"),
                                   INumber("TELESCOPE_FOCAL_LENGTH", format="%f", min=0, max=100000, step=1,
-                                          value=device["focal_len"], label="Focal Length (mm)")],
+                                          value=optics["focal_len"], label="Focal Length (mm)")],
                                  self._devname, "TELESCOPE_INFO", IPState.IDLE, IPerm.RO, label="Optical Properties"),
                    None)
 
-        self.IDDef(ISwitchVector([ISwitch("DEW_HEATER_ENABLED",
-                                          ISState.ON if status["result"]["setting"]["heater_enable"] else ISState.OFF),
-                                  ISwitch("DEW_HEATER_DISABLED",
-                                          ISState.OFF if status["result"]["setting"]["heater_enable"] else ISState.ON)],
-                                 self._devname, "DEW_HEATER", state=IPState.OK, rule=ISRule.ONEOFMANY, perm=IPerm.RW,
-                                 label="Dew Heater Enable"),
+        self.IDDef(INumberVector([INumber("DEW_HEATER_POWER", format="%f", min=0, max=100, step=1,
+                                          value=0, label="Power Setting (%)")],
+                                 self._devname, "DEW_HEATER", state=IPState.IDLE, perm=IPerm.RW,
+                                 label="Dew Heater Power"),
                    None)
         
-        self.IDDef(ISwitchVector([ISwitch("PARK",
-                                          ISState.ON if status["result"]["mount"]["close"] else ISState.OFF),
-                                  ISwitch("UNPARK",
-                                          ISState.OFF if status["result"]["mount"]["close"] else ISState.ON)],
+        self.IDDef(ISwitchVector([ISwitch("PARK", ISState.ON, "Close/Lower Arm"),
+                                  ISwitch("UNPARK", ISState.OFF, "Raise Arm")],
                                  self._devname, "TELESCOPE_PARK", state=IPState.IDLE, rule=ISRule.ONEOFMANY,
                                  perm=IPerm.RW, label="Raise/Lower Arm"),
                    None)
@@ -120,12 +140,6 @@ class SeestarScope(SeestarCommon):
                                  self._devname, "TELESCOPE_PIER_SIDE", state=IPState.IDLE,
                                  rule=ISRule.ATMOST1, perm=IPerm.RO, label="Mount Pier Side"),
                    None)
-
-    def ISNewText(self, device, name, values, names):
-        """A text vector has been updated from the client."""
-
-        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
-        self.IUUpdate(device, name, values, names, Set=True)
 
     def ISNewNumber(self, device, name, values, names):
         """A number vector has been updated from the client."""
@@ -149,8 +163,8 @@ class SeestarScope(SeestarCommon):
             switch = self['ON_COORD_SET']
             if switch['SLEW'].value == ISState.ON or switch['TRACK'].value == ISState.ON:
                 # Slew/GoTo requested
-                if self.goToInProgress():
-                    self.terminateGoTo()
+                if self.is_moving():
+                    self.connection.rpc_command("scope_abort_slew")
                 cmd = "iscope_start_view"
                 params = {"mode": "star", "target_ra_dec": [ra, dec], "target_name": "Stellarium Target", "lp_filter": False}
             elif switch["SYNC"].value == ISState.ON:
@@ -160,10 +174,24 @@ class SeestarScope(SeestarCommon):
 
             try:
                 response = self.connection.send_cmd_and_await_response(cmd, params=params)
-                self.IDMessage(f"Set RA/Dec to {(ra, dec)}")
+                self.IUUpdate(device, name, [ra, dec], # TODO: read this from response
+                              ["RA", "DEC"], Set=True)
 
             except Exception as error:
-                self.IDMessage(f"Seestar command error: {error}")
+                self.IDMessage(f"Seestar command error: {error}", msgtype="ERROR")
+
+        elif name == "DEW_HEATER":
+                heater = self.IUUpdate(device, name, values, names)
+                power = values[0]
+                reply = self.connection.send_cmd_and_await_response("pi_output_set2",
+                                                                    params={"heater": {"state" :power>0,
+                                                                                       "value": power}})
+                if reply["code"]:
+                    heater.state = IPState.ALERT
+                    self.IDMessage("Error setting dew heater power", msgtype="ERROR")
+                else:
+                    heater.state = IPState.OK
+                self.IDSet(heater)
 
     def ISNewSwitch(self, device, name, values, names):
         """A switch vector has been updated from the client."""
@@ -187,13 +215,6 @@ class SeestarScope(SeestarCommon):
                         elif name == "PARK":
                             self.park()
 
-            elif name == "DEW_HEATER":
-                heater = self.IUUpdate(device, name, values, names)
-                if heater["DEW_HEATER_DISABLED"] == ISState.ON:
-                    self.connection.rpc_command("set_setting", params=[{"heater_enable": False}])
-                elif heater["DEW_HEATER_ENABLED"] == ISState.ON:
-                    self.connection.rpc_command("set_setting", params=[{"heater_enable": True}])
-
             else:
                 prop = self.IUUpdate(device, name, values, names)
                 self.IDSet(prop)
@@ -201,40 +222,31 @@ class SeestarScope(SeestarCommon):
         except Exception as error:
             self.IDMessage(f"Error updating {name} property: {error}")
             raise
-            
+        
     @IDevice.repeat(2000) # ms
     def do_repeat(self):
         """Tasks to repeat every other second."""
 
-        self.IDMessage("Running repeat function")
-        
+        if not self.connected:
+            return
+
+        self.IDMessage("Running telescope loop")
+
         try:
             result = self.connection.send_cmd_and_await_response("scope_get_equ_coord")["result"]
             ra = result['ra']
             dec = result['dec']
-            self.IUUpdate(self._devname, 'EQUATORIAL_EOD_COORD', [ra, dec], ['RA', 'DEC'], Set=True)
+            self.IUUpdate(self._devname, "EQUATORIAL_EOD_COORD", [ra, dec], ["RA", "DEC"], Set=True)
             
         except Exception as error:
             self.IDMessage(f"Seestar communication error: {error}")
 
-    def goToInProgress(self):
-        """Return true if a GoTo is in progress, false otherwise"""
-        
-        try:
-            result = self.connection.send_cmd_and_await_response("get_view_state")["result"]
-            return result['View']['stage'] == 'AutoGoto'
-        
-        except Exception as error:
-            self.IDMessage(f"Seestar communication error: {error}")
-        
-    def terminateGoTo(self):
-        """Terminates current GoTo operation"""
-        
-        try:
-            self.connection.rpc_command("iscope_stop_view", params={"stage": "AutoGoto"})
-        
-        except Exception as error:
-            self.IDMessage(f"Error terminating GoTo: {error}")
+    def is_moving(self):
+        """Checks if the mount is currently moving and returns True if it is."""
+
+        result = self.connection.send_cmd_and_await_response("get_device_state",
+                                                             params={"keys": ["mount"]})["result"]["mount"]
+        return result["move_type"] != "none"
 
     def park(self):
         self.connection.rpc_command("scope_park")
@@ -336,7 +348,6 @@ class SeestarCamera(SeestarCommon):
                 
             except Exception as error:
                 self.IDMessage(f"Seestar command error: {error}")
-                
 
     def ISNewSwitch(self, device, name, values, names):
         """
@@ -402,6 +413,8 @@ if __name__ == "__main__":
         camera_connection: ImageConnectionManager = get_connection_manager(DEFAULT_ADDR, IMAGING_PORT, "img")
         camera_connection.start_listening()
 
+        time.sleep(1.0)
+
         if "--set-time" in sys.argv:
             logger.info(f"Setting Seestar time to {now}")
             scope_connection.rpc_command("pi_set_time",
@@ -414,9 +427,10 @@ if __name__ == "__main__":
             zip_data = log_connection.get_log_dump()
             with (CONFIG_DIR/"seestar_svr_log.zip").open("wb+") as zipfile:
                 zipfile.write(zip_data)
+            log_connection.disconnect()
             time.sleep(0.5)
         # scope_connection.rpc_command("get_view_state")
-        time.sleep(1.0)
+        # time.sleep(0.5)
         scope_connection.rpc_command("get_device_state", params={"keys": ["device", "camera", "pi_status"]})
         time.sleep(0.5)
         # scope_connection.rpc_command("scope_get_ra_dec")
