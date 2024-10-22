@@ -51,12 +51,6 @@ class SeestarCommon(IDevice):
                                  IPerm.RW, label="Connection"),
                    None)
 
-        utc_now = dt.datetime.now().astimezone(dt.timezone.utc)
-        self.IDDef(ITextVector([IText("UTC", utc_now.strftime("%Y-%m-%dT%H:%M:%S.%f")),
-                                IText("OFFSET", "+0000")],
-                               self._devname, "TIME_UTC", IPState.IDLE, IPerm.RW, timeout=1),
-                   None)
-
     def ISNewNumber(self, device, name, values, names):
         """A numeric vector has been updated from the client."""
 
@@ -75,8 +69,21 @@ class SeestarCommon(IDevice):
     def ISNewText(self, device, name, values, names):
         """A text vector has been updated from the client."""
 
-        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
-        self.IUUpdate(device, name, values, names, Set=True)
+        if name == "TIME_UTC":
+            for prop, value in zip(names, values):
+                if prop == "UTC":
+                    time_set = dt.datetime.fromisoformat(value)
+                elif prop == "OFFSET":
+                    utc_offset = dt.timedelta(hours=int(value.rstrip("0")))
+            time_utc = (time_set - utc_offset).timetuple()
+            self.IDMessage(f"Setting device time to {time.strftime('%Y-%m-%dT%H:%M:%S', time_utc)}", msgtype="INFO")
+            self.connection.rpc_command("pi_set_time", params={"year": time_utc.tm_year, "mon": time_utc.tm_mon,
+                                                               "day": time_utc.tm_mday, "hour": time_utc.tm_hour,
+                                                               "min": time_utc.tm_min, "sec": time_utc.tm_sec,
+                                                               "time_zone": "Etc/UTC"})
+        else:
+            self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
+            self.IUUpdate(device, name, values, names, Set=True)
 
     def handle_connection_update(self, devname, actions: "list[str]", states: "list[ISState]"):
         conn = self.IUUpdate(devname, "CONNECTION", states, actions)
@@ -388,13 +395,6 @@ class SeestarFilter(SeestarCommon):
 
 if __name__ == "__main__":
 
-    # while not scope_connection.event_list:
-    #     time.sleep(0.01)
-    # initial_event = scope_connection.event_list[0]
-    # t0 = float(initial_event["Timestamp"])
-    # logger.debug(f"Initial event recorded at t={t0}")
-    now = time.localtime()
-
     if THIS_FILE_PATH.name == "indi_seestar_scope":
         scope = SeestarScope()
         scope.start()
@@ -416,6 +416,7 @@ if __name__ == "__main__":
         time.sleep(1.0)
 
         if "--set-time" in sys.argv:
+            now = time.localtime()
             logger.info(f"Setting Seestar time to {now}")
             scope_connection.rpc_command("pi_set_time",
                                          params={"year": now.tm_year, "mon": now.tm_mon, "day": now.tm_mday,
