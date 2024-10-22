@@ -264,6 +264,14 @@ class RawConnectionManager(BaseConnectionManager):
                 remaining = self.socket.recv(1024*64)
                 data = header_bytes + remaining
                 logger.warning(f"Received {len(data)}B non-header message: {data[:20]}...")
+
+
+class ImageConnectionManager(RawConnectionManager, RPCConnectionManager):
+
+    receive_loop = RawConnectionManager.receive_loop
+
+    def request_image():
+        ...
     
     def heartbeat_loop(self):
         while self._do_heartbeat:
@@ -273,16 +281,8 @@ class RawConnectionManager(BaseConnectionManager):
                 except:
                     time.sleep(3)
                     continue
-            self.send_json({"method": "test_connection", "id": 2})
+            self.send_json({"method": "test_connection", "id": 1})
             time.sleep(3)
-
-
-class ImageConnectionManager(RawConnectionManager, RPCConnectionManager):
-
-    receive_loop = RawConnectionManager.receive_loop
-
-    def request_image():
-        ...
 
 
 class LogConnectionManager(RawConnectionManager):
@@ -295,6 +295,17 @@ class LogConnectionManager(RawConnectionManager):
             time.sleep(2)
         self.disconnect()
         return self.raw_data
+    
+    def heartbeat_loop(self):
+        while self._do_heartbeat:
+            if not self.connected:
+                try:
+                    self.connect()
+                except:
+                    time.sleep(3)
+                    continue
+            self.send_json({"method": "test_connection", "id": 2})
+            time.sleep(3)
 
 # this block will be executed whenever this file is run or anything here is imported
 for port in (CONTROL_PORT,):# IMAGING_PORT, LOGGING_PORT):
