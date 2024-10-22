@@ -97,7 +97,7 @@ class SeestarCommon(IDevice):
 
 class SeestarScope(SeestarCommon):
 
-    def __init__(self, name=None, host=DEFAULT_ADDR):
+    def __init__(self, name="Seestar S50 Telescope", host=DEFAULT_ADDR):
         super().__init__(name, host)
 
     def ISGetProperties(self, device=None):
@@ -267,7 +267,7 @@ class SeestarScope(SeestarCommon):
 
 class SeestarCamera(SeestarCommon):
     
-    def __init__(self, name=None, host=DEFAULT_ADDR):
+    def __init__(self, name="Seestar S50 Camera", host=DEFAULT_ADDR):
         super().__init__(name=name, host=host)
         self.image_connection: ImageConnectionManager = get_connection_manager(host, IMAGING_PORT, "img")
 
@@ -396,16 +396,16 @@ if __name__ == "__main__":
     now = time.localtime()
 
     if THIS_FILE_PATH.name == "indi_seestar_scope":
-        scope = SeestarScope("MySeestar")
+        scope = SeestarScope()
         scope.start()
     elif THIS_FILE_PATH.name == "indi_seestar_ccd":
-        camera = SeestarCamera("MySeestar")
+        camera = SeestarCamera()
         camera.start()
     elif THIS_FILE_PATH.name == "indi_seestar_focuser":
-        focuser = SeestarFocuser("MySeestar")
+        focuser = SeestarFocuser()
         focuser.start()
     elif THIS_FILE_PATH.name == "indi_seestar_filterwheel":
-        filter_wheel = SeestarFilter("MySeestar")
+        filter_wheel = SeestarFilter()
         filter_wheel.start()
     else:
         scope_connection: RPCConnectionManager = get_connection_manager(DEFAULT_ADDR, CONTROL_PORT, "rpc")
