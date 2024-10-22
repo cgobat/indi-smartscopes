@@ -390,7 +390,86 @@ class SeestarFocuser(SeestarCommon):
 
 
 class SeestarFilter(SeestarCommon):
-    ...
+
+    def __init__(self, name="Seestar S50 Filter Wheel", host=DEFAULT_ADDR):
+        super().__init__(name, host)
+        self.filter_names = []
+
+    def ISGetProperties(self, device=None):
+        super().ISGetProperties(device)
+
+        self.IDDef(INumberVector([INumber("FILTER_SLOT_VALUE", format="%d", min=0, max=3, step=1,
+                                          value=3, label="Current Filter Position")],
+                                 self._devname, "FILTER_SLOT", state=IPState.IDLE, perm=IPerm.RW),
+                   None)
+
+        self.IDDef(ITextVector([IText("FILTER_NAME_VALUE", "unset", label="Current Filter Name")],
+                                 self._devname, "FILTER_NAME", state=IPState.IDLE, perm=IPerm.RO,
+                                 label="Active Filter"),
+                   None)
+
+    def ISNewNumber(self, dev, name, values, names):
+        if name == "FILTER_SLOT":
+            assert names == ["FILTER_SLOT_VALUE"]
+            self.set_position(values[0])
+        else:
+            super().ISNewNumber(dev, name, values, names)
+
+    def on_connect(self):
+        filter_pos = self.get_position()
+        self.filter_names = self.connection.send_cmd_and_await_response("get_wheel_slot_name")["result"]
+        slot_vec = self.IUUpdate(self._devname, "FILTER_SLOT", [filter_pos], ["FILTER_SLOT_VALUE"], Set=True)
+        name_vec = self.IUUpdate(self._devname, "FILTER_NAME", [self.filter_names[filter_pos]],
+                                 ["FILTER_NAME_VALUE"], Set=True)
+
+    @IDevice.repeat(5000)
+    def do_repeat(self):
+
+        if not self.connected:
+            return
+
+        self.IDMessage("Running filter wheel loop")
+
+        last_wheel_state = self.connection.event_states["WheelMove"]
+        if last_wheel_state is None:
+            self.IDMessage("No filter wheel status has been received yet.", msgtype="WARN")
+            return
+
+        position = last_wheel_state["position"]
+        last_position = self["FILTER_SLOT"]["FILTER_SLOT_VALUE"].value
+
+        if position == last_position:
+            return
+
+        pos_vec = self.IUUpdate(self._devname, "FILTER_SLOT", [position], ["FILTER_SLOT_VALUE"])
+        name_vec = self.IUUpdate(self._devname, "FILTER_NAME", [self.filter_names[position]], ["FILTER_NAME_VALUE"])
+
+        if last_wheel_state["state"] == "complete":
+            pos_vec.state = IPState.IDLE
+        elif last_wheel_state["state"] == "start":
+            pos_vec.state = IPState.BUSY
+        else:
+            pos_vec.state = IPState.ALERT
+
+        self.IDSet(pos_vec)
+        self.IDSet(name_vec)
+
+    def get_position(self) -> int:
+        if "WheelMove" in self.connection.event_states:
+            if self.connection.event_states["WheelMove"]["state"] == "complete":
+                return self.connection.event_states["WheelMove"]["position"]
+            else:
+                logger.warning("Filter wheel move not complete: latest status is '%s'",
+                               self.connection.event_states["WheelMove"]["state"])
+        else:
+            logger.warning("No filter wheel information has been received yet")
+        return 3
+    
+    def set_position(self, pos: int):
+        if pos in range(3):
+            self.connection.rpc_command("set_wheel_position", params=[pos])
+        else:
+            raise ValueError(f"Requested position {pos} does not exist")
 
 
 if __name__ == "__main__":
