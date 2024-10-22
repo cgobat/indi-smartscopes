@@ -308,13 +308,11 @@ class LogConnectionManager(RawConnectionManager):
             time.sleep(3)
 
 # this block will be executed whenever this file is run or anything here is imported
-for port in (CONTROL_PORT,):# IMAGING_PORT, LOGGING_PORT):
-    lock_fd = os.open(lock_file_path, os.O_CREAT|os.O_RDWR)
-    try:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
-        os.write(lock_fd, f"{os.getpid()}\n".encode())
-        # server_thread = threading.Thread(target=start_receiving)
-        # server_thread.start()
-    except BlockingIOError:
-        logger.error(f"Another process already has a lock on {lock_file_path}")
-        raise # for now
+# for port in (CONTROL_PORT,):# IMAGING_PORT, LOGGING_PORT):
+#     lock_fd = os.open(lock_file_path, os.O_CREAT|os.O_RDWR)
+#     try:
+#         fcntl.flock(lock_fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
+#         os.write(lock_fd, f"{os.getpid()}\n".encode())
+#     except BlockingIOError:
+#         logger.error(f"Another process already has a lock on {lock_file_path}")
+#         raise # for now
