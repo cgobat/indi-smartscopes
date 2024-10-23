@@ -339,11 +339,9 @@ class SeestarCamera(SeestarCommon):
         self.IUUpdate(device, name, values, names, Set=True)
 
     def ISNewNumber(self, device, name, values, names):
-        """
-        A number vector has been updated from the client.
-        """
+
         self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
-        
+
         if name == "CCD_EXPOSURE":
             self.IDMessage(f"Initiating {values[0]} sec exposure")
             
@@ -356,20 +354,11 @@ class SeestarCamera(SeestarCommon):
                 self.IDMessage(f"Seestar command error: {error}")
 
     def ISNewSwitch(self, device, name, values, names):
-        """
-        A switch has been updated from the client.
-        """
 
-        self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
-
-        try:
-            if name == "CONNECTION":
-                self.handle_connection_update(device, names, values)
-            else:
-                prop = self.IUUpdate(device, name, values, names, Set=True)
-
-        except Exception as error:
-            self.IDMessage(f"Error updating {name} property: {error}")
+        if name == "CONNECTION":
+            self.handle_connection_update(device, names, values)
+        else:
+            super().ISNewSwitch(device, name, values, names)
     
     @IDevice.repeat(2000)
     def do_repeat(self):
