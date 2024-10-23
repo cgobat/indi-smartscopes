@@ -236,7 +236,7 @@ class SeestarScope(SeestarCommon):
         if not self.connected:
             return
 
-        self.IDMessage("Running telescope loop")
+        self.IDMessage("Running telescope loop", msgtype="DEBUG")
 
         try:
             result = self.connection.send_cmd_and_await_response("scope_get_equ_coord")["result"]
@@ -363,7 +363,7 @@ class SeestarCamera(SeestarCommon):
     @IDevice.repeat(2000)
     def do_repeat(self):
         
-        self.IDMessage("Running camera loop")
+        self.IDMessage("Running camera loop", msgtype="DEBUG")
 
         try:
             result = self.connection.send_cmd_and_await_response("get_control_value", params=["Temperature"])["result"]
@@ -416,7 +416,7 @@ class SeestarFilter(SeestarCommon):
         if not self.connected:
             return
 
-        self.IDMessage("Running filter wheel loop")
+        self.IDMessage("Running filter wheel loop", msgtype="DEBUG")
 
         last_wheel_state = self.connection.event_states["WheelMove"]
         if last_wheel_state is None:
