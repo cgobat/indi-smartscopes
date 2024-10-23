@@ -374,7 +374,128 @@ class SeestarCamera(SeestarCommon):
 
 
 class SeestarFocuser(SeestarCommon):
-    ...
+
+    def __init__(self, name="Seestar S50 Focuser", host=DEFAULT_ADDR):
+        super().__init__(name=name)
+        self.connection: RPCConnectionManager = get_connection_manager(host, CONTROL_PORT, "rpc")
+
+    def ISGetProperties(self, device=None):
+        super().ISGetProperties(device)
+
+        self.IDDef(INumberVector([INumber("FOCUS_ABSOLUTE_POSITION", "%d", 0, 2600,
+                                          5, value=1700, label="Focuser Position")],
+                                 self._devname, "ABS_FOCUS_POSITION",
+                                 state=IPState.OK, perm=IPerm.RW),
+                   None)
+        
+        self.IDDef(INumberVector([INumber("FOCUS_MAX_VALUE", "%d", None, None,
+                                          1, 2600, label="Focuser Maximum")], # TODO: is this the same for everyone?
+                                 self._devname, "FOCUS_MAX", state=IPState.IDLE, perm=IPerm.RO),
+                   None)
+        
+        self.IDDef(ISwitchVector([ISwitch("START_AUTOFOCUS", ISState.OFF, "Start Autofocus Routine"),
+                                  ISwitch("STOP_AUTOFOCUS", ISState.OFF, "Stop Autofocus Routine")],
+                                 self._devname, "AUTOFOCUS", state=IPState.IDLE, rule=ISRule.ATMOST1,
+                                 perm=IPerm.WO, timeout=10., label="Autofocus Routine"),
+                   None)
+    
+    def ISNewNumber(self, dev, name, values, names):
+        if name == "ABS_FOCUS_POSITION":
+            assert names[0] == "FOCUS_ABSOLUTE_POSITION"
+            code = self.move_absolute(values[0])
+            if code:
+                self.IDMessage(f"Attempt to set focuser position to {values[0]} returned code {code}.",
+                               msgtype="ERROR")
+                state = IPState.ALERT
+            else:
+                state = IPState.OK
+            vec = self.IUUpdate(dev, name, [], names)
+            vec.state = state
+        else:
+            super().ISNewNumber(dev, name, values, names)
+    
+    def ISNewSwitch(self, dev, name, values, names):
+        if name == "CONNECTION":
+            self.handle_connection_update(dev, names, values)
+        elif name == "AUTOFOCUS":
+            action_name = [action for action, state in zip(names, values) if state==ISState.ON].pop()
+            if action_name == "START_AUTOFOCUS":
+                self.start_auto_focus()
+                vec: ISwitchVector = self.IUUpdate(dev, name, values, names)
+                vec.state = IPState.BUSY
+                self.IDSet(vec, msg="Autofocusing")
+            elif action_name == "STOP_AUTOFOCUS":
+                self.stop_auto_focus()
+                vec = self.IUUpdate(dev, name, values, names)
+                vec.state = IPState.IDLE
+                self.IDSet(vec, msg="Autofocus stopped")
+        else:
+            self.IDMessage(f"Seestar focuser has no '{name}' ISwitchVector.", msgtype="ERROR")
+
+    def on_connect(self):
+        focus_state = self.connection.send_cmd_and_await_response("get_device_state",
+                                                                  params={"keys": ["focuser"]})
+        focuser = focus_state["result"]["focuser"]
+        max_vec: INumberVector = self.IUUpdate(self._devname, "FOCUS_MAX", [focuser["max_step"]], ["FOCUS_MAX_VALUE"])
+        max_num: INumber = max_vec["FOCUS_MAX_VALUE"]
+        max_num.value = max_num.min = max_num.max = focuser["max_step"]
+        self.IDSet(max_vec)
+        pos_vec: INumberVector = self.IUUpdate(self._devname, "ABS_FOCUS_POSITION", [focuser["step"]], ["FOCUS_ABSOLUTE_POSITION"])
+        pos_num: INumber = pos_vec["FOCUS_ABSOLUTE_POSITION"]
+        pos_num.max = focuser["max_step"]
+        self.IDSet(pos_vec)
+
+    def get_position(self) -> int:
+        response = self.connection.send_cmd_and_await_response("get_focuser_position",
+                                                               params={"ret_obj": True})
+        return response["result"]["step"]
+
+    def move_absolute(self, position: int):
+        status = self.connection.send_cmd_and_await_response("move_focuser",
+                                                             params={"step": position,
+                                                                     "ret_step": True})
+        return status["code"]
+
+    def move_relative(self, steps: int):
+        current = self.get_position()
+        code = self.move_absolute(current+steps)
+        return code
+
+    def start_auto_focus(self) -> bool:
+        result = self.connection.send_cmd_and_await_response("start_auto_focuse")
+        return result.get("code", 1) == 0
+    
+    def stop_auto_focus(self) -> bool:
+        result = self.connection.send_cmd_and_await_response("stop_auto_focuse")
+        return result.get("code", 1) == 0
+    
+    @IDevice.repeat(5000)
+    def do_repeat(self):
+
+        if not self.connected:
+            return
+
+        self.IDMessage("Running focuser loop", msgtype="DEBUG")
+
+        last_focus_state = self.connection.event_states["FocuserMove"]
+        if last_focus_state is None:
+            self.IDMessage("No focuser status has been received yet.", msgtype="WARN")
+            return
+
+        position = last_focus_state["position"]
+
+        pos_vec = self.IUUpdate(self._devname, "ABS_FOCUS_POSITION", [position], ["FOCUS_ABSOLUTE_POSITION"])
+
+        if last_focus_state["state"] == "complete":
+            pos_vec.state = IPState.IDLE
+        elif last_focus_state["state"] == "working":
+            pos_vec.state = IPState.BUSY
+        elif last_focus_state["state"] == "cancel":
+            pos_vec.state = IPState.ALERT
+        else:
+            ...
+
+        self.IDSet(pos_vec, msg=f"Focuser position is {position}")
 
 
 class SeestarFilter(SeestarCommon):
