@@ -157,15 +157,15 @@ class SeestarScope(SeestarCommon):
             current = self["EQUATORIAL_EOD_COORD"]
             ra, dec = float(current['RA'].value), float(current['DEC'].value)
 
-            self.IDMessage(f"Current pointing: RA={ra}, Dec={dec}")
+            self.IDMessage(f"Current pointing: ({ra=}, {dec=})")
 
-            for name, value in zip(names, values):
-                if name == 'RA':
+            for propname, value in zip(names, values):
+                if propname == "RA":
                     ra = value
-                elif name == 'DEC':
+                elif propname == "DEC":
                     dec = value
 
-            self.IDMessage(f"Requested RA/Dec: ({ra}, {dec})")
+            self.IDMessage(f"Requested ({ra=}, {dec=})")
 
             switch = self['ON_COORD_SET']
             if switch['SLEW'].value == ISState.ON or switch['TRACK'].value == ISState.ON:
@@ -181,8 +181,7 @@ class SeestarScope(SeestarCommon):
 
             try:
                 response = self.connection.send_cmd_and_await_response(cmd, params=params)
-                self.IUUpdate(device, name, [ra, dec], # TODO: read this from response
-                              ["RA", "DEC"], Set=True)
+                assert response["code"] == 0, f"Got non-zero response code {response['code']} ({response.get('error')})"
 
             except Exception as error:
                 self.IDMessage(f"Seestar command error: {error}", msgtype="ERROR")
