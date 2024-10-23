@@ -2,8 +2,8 @@
 
 import sys
 import time
-import tzlocal
 import logging
+import tzlocal
 import datetime as dt
 from pathlib import Path
 from collections import defaultdict
@@ -16,7 +16,6 @@ sys.path.append(THIS_FILE_PATH.resolve().parent.as_posix()) # resolve source dir
 
 from socket_connections import (DEFAULT_ADDR, CONFIG_DIR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT,
                                 RPCConnectionManager, ImageConnectionManager, LogConnectionManager)
-
 
 logger = logging.getLogger(THIS_FILE_PATH.stem)
 connection_managers = defaultdict(dict)
@@ -108,6 +107,7 @@ class SeestarScope(SeestarCommon):
         super().__init__(name, host)
 
     def ISGetProperties(self, device=None):
+        super().ISGetProperties(device)
 
         self.IDDef(INumberVector([INumber("RA", "%2.8f", 0, 24, 1, 0.0, label="RA"),
                                   INumber("DEC", "%2.8f", -90, 90, 1, 0.0, label="Dec")],
@@ -121,11 +121,11 @@ class SeestarScope(SeestarCommon):
                                  self._devname, "ON_COORD_SET", IPState.IDLE, ISRule.ONEOFMANY,
                                  IPerm.RW, label="On coord set"),
                    None)
-        
+
         optics = {"focal_len": 250.0, "fnumber": 5.0}
-        self.IDDef(INumberVector([INumber("TELESCOPE_APERTURE", format="%f", min=0, max=10000, step=1,
+        self.IDDef(INumberVector([INumber("TELESCOPE_APERTURE", format="%f", min=0, max=None, step=1,
                                           value=optics["focal_len"]/optics["fnumber"], label="Aperture (mm)"),
-                                  INumber("TELESCOPE_FOCAL_LENGTH", format="%f", min=0, max=100000, step=1,
+                                  INumber("TELESCOPE_FOCAL_LENGTH", format="%f", min=0, max=None, step=1,
                                           value=optics["focal_len"], label="Focal Length (mm)")],
                                  self._devname, "TELESCOPE_INFO", IPState.IDLE, IPerm.RO, label="Optical Properties"),
                    None)
@@ -135,13 +135,13 @@ class SeestarScope(SeestarCommon):
                                  self._devname, "DEW_HEATER", state=IPState.IDLE, perm=IPerm.RW,
                                  label="Dew Heater Power"),
                    None)
-        
+
         self.IDDef(ISwitchVector([ISwitch("PARK", ISState.ON, "Close/Lower Arm"),
                                   ISwitch("UNPARK", ISState.OFF, "Raise Arm")],
                                  self._devname, "TELESCOPE_PARK", state=IPState.IDLE, rule=ISRule.ONEOFMANY,
                                  perm=IPerm.RW, label="Raise/Lower Arm"),
                    None)
-        
+
         self.IDDef(ISwitchVector([ISwitch("PIER_EAST", ISState.OFF),
                                   ISwitch("PIER_WEST", ISState.OFF)],
                                  self._devname, "TELESCOPE_PIER_SIDE", state=IPState.IDLE,
@@ -152,7 +152,7 @@ class SeestarScope(SeestarCommon):
         """A number vector has been updated from the client."""
 
         self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
-        
+
         if name == "EQUATORIAL_EOD_COORD":
             current = self["EQUATORIAL_EOD_COORD"]
             ra, dec = float(current['RA'].value), float(current['DEC'].value)
@@ -191,7 +191,7 @@ class SeestarScope(SeestarCommon):
                 heater = self.IUUpdate(device, name, values, names)
                 power = values[0]
                 reply = self.connection.send_cmd_and_await_response("pi_output_set2",
-                                                                    params={"heater": {"state" :power>0,
+                                                                    params={"heater": {"state": power>0,
                                                                                        "value": power}})
                 if reply["code"]:
                     heater.state = IPState.ALERT
@@ -244,7 +244,7 @@ class SeestarScope(SeestarCommon):
             ra = result['ra']
             dec = result['dec']
             self.IUUpdate(self._devname, "EQUATORIAL_EOD_COORD", [ra, dec], ["RA", "DEC"], Set=True)
-            
+
         except Exception as error:
             self.IDMessage(f"Seestar communication error: {error}")
 
