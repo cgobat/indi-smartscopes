@@ -73,9 +73,11 @@ class SeestarCommon(IDevice):
                 if prop == "UTC":
                     time_set = dt.datetime.fromisoformat(value)
                 elif prop == "OFFSET":
-                    utc_offset = dt.timedelta(hours=int(value.rstrip("0")))
-            time_utc = (time_set - utc_offset).timetuple()
+                    utc_offset = int(value.rstrip("0"))
+                    sign = "-" if utc_offset<0 else "+"
+            time_utc = (time_set - dt.timedelta(hours=utc_offset)).timetuple()
             self.IDMessage(f"Setting device time to {time.strftime('%Y-%m-%dT%H:%M:%S', time_utc)}", msgtype="INFO")
+            # self.connection.rpc_command("scope_set_time", params=[time_set.isoformat(), f"{sign}{abs(utc_offset)}"])
             self.connection.rpc_command("pi_set_time", params={"year": time_utc.tm_year, "mon": time_utc.tm_mon,
                                                                "day": time_utc.tm_mday, "hour": time_utc.tm_hour,
                                                                "min": time_utc.tm_min, "sec": time_utc.tm_sec,
