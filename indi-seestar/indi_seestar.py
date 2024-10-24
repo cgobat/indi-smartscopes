@@ -114,7 +114,13 @@ class SeestarScope(SeestarCommon):
         self.IDDef(INumberVector([INumber("RA", "%2.8f", 0, 24, 1, 0.0, label="RA"),
                                   INumber("DEC", "%2.8f", -90, 90, 1, 0.0, label="Dec")],
                                  self._devname, "EQUATORIAL_EOD_COORD", IPState.OK, IPerm.RW,
-                                 label="Pointing Coordinates"),
+                                 label="Sky Coordinates"),
+                   None)
+
+        self.IDDef(INumberVector([INumber("ALT", "%2.8f", -90, 90, 1, 0.0, label="Altitude"),
+                                  INumber("AZ", "%2.8f", 0, 360, 1, 0.0, label="Azimuth")],
+                                 self._devname, "HORIZONTAL_COORD", IPState.OK, IPerm.RW,
+                                 label="Topocentric Coordinates"),
                    None)
 
         self.IDDef(ISwitchVector([ISwitch("SLEW", ISState.ON, "Slew"),
@@ -241,13 +247,16 @@ class SeestarScope(SeestarCommon):
         self.IDMessage("Running telescope loop", msgtype="DEBUG")
 
         try:
-            result = self.connection.send_cmd_and_await_response("scope_get_equ_coord")["result"]
-            ra = result['ra']
-            dec = result['dec']
+            eq_coord = self.connection.send_cmd_and_await_response("scope_get_equ_coord")["result"]
+            ra = eq_coord['ra']
+            dec = eq_coord['dec']
             self.IUUpdate(self._devname, "EQUATORIAL_EOD_COORD", [ra, dec], ["RA", "DEC"], Set=True)
+            horiz_coord = self.connection.send_cmd_and_await_response("scope_get_horiz_coord")
+            alt, az = horiz_coord["result"]
+            self.IUUpdate(self._devname, "HORIZONTAL_COORD", [alt, az], ["ALT", "AZ"], Set=True)
 
         except Exception as error:
-            self.IDMessage(f"Seestar communication error: {error}")
+            self.IDMessage(f"Error updating coordinates from Seestar: {error}")
 
     def is_moving(self):
         """Checks if the mount is currently moving and returns True if it is."""
