@@ -161,11 +161,11 @@ class SeestarScope(SeestarCommon):
 
         self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}")
 
-        if name == "EQUATORIAL_EOD_COORD":
+        if name in ("EQUATORIAL_EOD_COORD", "TARGET_EOD_COORD"):
             current = self["EQUATORIAL_EOD_COORD"]
-            ra, dec = float(current['RA'].value), float(current['DEC'].value)
+            curr_ra, curr_dec = float(current['RA'].value), float(current['DEC'].value)
 
-            self.IDMessage(f"Current pointing: ({ra=}, {dec=})")
+            self.IDMessage(f"Current pointing: ({curr_ra}, {curr_dec})")
 
             for propname, value in zip(names, values):
                 if propname == "RA":
@@ -181,7 +181,7 @@ class SeestarScope(SeestarCommon):
                 if self.is_moving():
                     self.connection.rpc_command("scope_abort_slew")
                 cmd = "iscope_start_view"
-                params = {"mode": "star", "target_ra_dec": [ra, dec], "target_name": "Stellarium Target", "lp_filter": False}
+                params = {"mode": "star", "target_ra_dec": [ra, dec], "target_name": "INDI Target", "lp_filter": False}
             elif switch["SYNC"].value == ISState.ON:
                 # Sync requested
                 cmd = "scope_sync"
@@ -193,6 +193,9 @@ class SeestarScope(SeestarCommon):
 
             except Exception as error:
                 self.IDMessage(f"Seestar command error: {error}", msgtype="ERROR")
+            
+            if name.startswith("TARGET"):
+                self.IUUpdate(device, name, values, names, Set=True)
 
         elif name == "DEW_HEATER":
                 heater = self.IUUpdate(device, name, values, names)
@@ -206,6 +209,9 @@ class SeestarScope(SeestarCommon):
                 else:
                     heater.state = IPState.OK
                 self.IDSet(heater)
+        
+        else:
+            super().ISNewNumber(device, name, values, names)
 
     def ISNewSwitch(self, device, name, values, names):
         """A switch vector has been updated from the client."""
