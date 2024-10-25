@@ -1,0 +1,87 @@
+<INDIDriver>
+
+    <!-- mount/telescope -->
+    <defNumberVector device="Seestar S50 Telescope" perm="rw" state="Ok" label="Sky Coordinates" name="EQUATORIAL_EOD_COORD">
+        <defNumber name="RA" step="1" max="24" min="0" format="%.6f" label="RA">0.0</defNumber>
+        <defNumber name="DEC" step="1" max="90" min="-90" format="%.6f" label="Dec">0.0</defNumber>
+    </defNumberVector>
+    <defNumberVector device="Seestar S50 Telescope" perm="rw" state="Ok" label="Topocentric Coordinates" name="HORIZONTAL_COORD">
+        <defNumber name="ALT" step="1" max="90" min="-90" format="%.6f" label="Altitude">0.0</defNumber>
+        <defNumber name="AZ" step="1" max="360" min="0" format="%.6f" label="Azimuth">0.0</defNumber>
+    </defNumberVector>
+    <defSwitchVector device="Seestar S50 Telescope" rule="OneOfMany" perm="rw" state="Idle" label="On coord set" name="ON_COORD_SET">
+        <defSwitch name="SLEW" label="Slew">On</defSwitch>
+        <defSwitch name="TRACK" label="Track">Off</defSwitch>
+        <defSwitch name="SYNC" label="Sync">Off</defSwitch>
+    </defSwitchVector>
+    <defNumberVector device="Seestar S50 Telescope" perm="ro" state="Idle" label="Optical Properties" name="TELESCOPE_INFO">
+        <defNumber name="TELESCOPE_APERTURE" step="1" max="None" min="0" format="%.1f" label="Aperture (mm)">50.0</defNumber>
+        <defNumber name="TELESCOPE_FOCAL_LENGTH" step="1" max="None" min="0" format="%.1f" label="Focal Length (mm)">250.0</defNumber>
+    </defNumberVector>
+    <defNumberVector device="Seestar S50 Telescope" perm="rw" state="Idle" label="Dew Heater Power" name="DEW_HEATER">
+        <defNumber name="DEW_HEATER_POWER" step="1" max="100" min="0" format="%f" label="Power Setting (%)">0</defNumber>
+    </defNumberVector>
+    <defSwitchVector device="Seestar S50 Telescope" rule="OneOfMany" perm="rw" state="Idle" label="Raise/Lower Arm" name="TELESCOPE_PARK">
+        <defSwitch name="PARK" label="Close/Lower Arm">On</defSwitch>
+        <defSwitch name="UNPARK" label="Raise Arm">Off</defSwitch>
+    </defSwitchVector>
+    <defNumberVector device="Seestar S50 Telescope" perm="ro" state="Idle" label="TELESCOPE_PARK_POSITION" name="TELESCOPE_PARK_POSITION">
+        <defNumber name="PARK_AZ" step="1" max="360" min="0" format="%f" label="PARK_AZ">0</defNumber>
+        <defNumber name="PARK_ALT" step="1" max="90" min="-90" format="%f" label="PARK_ALT">-90</defNumber>
+    </defNumberVector>
+    <defSwitchVector device="Seestar S50 Telescope" rule="OneOfMany" perm="ro" state="Idle" label="TELESCOPE_PARK_OPTION" name="TELESCOPE_PARK_OPTION">
+        <defSwitch name="PARK_DEFAULT" label="PARK_DEFAULT">On</defSwitch>
+        <defSwitch name="PARK_CURRENT" label="PARK_CURRENT">Off</defSwitch>
+        <defSwitch name="PARK_WRITE_DATA" label="PARK_WRITE_DATA">Off</defSwitch>
+    </defSwitchVector>
+    <defSwitchVector device="Seestar S50 Telescope" rule="AtMostOne" perm="ro" state="Idle" label="Mount Pier Side" name="TELESCOPE_PIER_SIDE">
+        <defSwitch name="PIER_EAST" label="PIER_EAST">Off</defSwitch>
+        <defSwitch name="PIER_WEST" label="PIER_WEST">Off</defSwitch>
+    </defSwitchVector>
+
+    <!-- camera -->
+    <defNumberVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Camera Properties" name="CCD_INFO">
+        <defNumber name="CCD_MAX_X" step="1" max="None" min="0" format="%d" label="CCD_MAX_X">1080</defNumber>
+        <defNumber name="CCD_MAX_Y" step="1" max="None" min="0" format="%d" label="CCD_MAX_Y">1920</defNumber>
+        <defNumber name="CCD_PIXEL_SIZE" step="1" max="None" min="0" format="%.1f" label="CCD_PIXEL_SIZE">2.9</defNumber>
+        <defNumber name="CCD_PIXEL_SIZE_X" step="1" max="None" min="0" format="%.1f" label="CCD_PIXEL_SIZE_X">2.9</defNumber>
+        <defNumber name="CCD_PIXEL_SIZE_Y" step="1" max="None" min="0" format="%.1f" label="CCD_PIXEL_SIZE_Y">2.9</defNumber>
+        <defNumber name="CCD_BITSPERPIXEL" step="4" max="32" min="0" format="%d" label="CCD_BITSPERPIXEL">16</defNumber>
+    </defNumberVector>
+    <defTextVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Bayer Matrix" name="CCD_CFA">
+        <defText name="CFA_OFFSET_X" label="Bayer X offset">0</defText>
+        <defText name="CFA_OFFSET_Y" label="Bayer Y offset">0</defText>
+        <defText name="CFA_TYPE" label="Bayer pattern">GRBG</defText>
+    </defTextVector>
+    <defSwitchVector device="Seestar S50 Camera" rule="OneOfMany" perm="rw" state="Idle" label="Exposure Type" name="CCD_FRAME_TYPE">
+        <defSwitch name="FRAME_LIGHT" label="Light">On</defSwitch>
+        <defSwitch name="FRAME_BIAS" label="Bias">Off</defSwitch>
+        <defSwitch name="FRAME_DARK" label="Dark">Off</defSwitch>
+        <defSwitch name="FRAME_FLAT" label="Flat">Off</defSwitch>
+    </defSwitchVector>
+    <defNumberVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Camera Temperature" name="CCD_TEMPERATURE">
+        <defNumber name="CCD_TEMPERATURE_VALUE" step="0.1" max="100.0" min="-273.15" format="%f" label="Temperature (C)">0.0</defNumber>
+    </defNumberVector>
+    <!-- BLOB vector 'CCD1' defined in source -->
+
+    <!-- focuser -->
+    <defNumberVector device="Seestar S50 Focuser" perm="rw" state="Ok" label="ABS_FOCUS_POSITION" name="ABS_FOCUS_POSITION">
+        <defNumber name="FOCUS_ABSOLUTE_POSITION" step="5" max="2600" min="0" format="%d" label="Focuser Position">1700</defNumber>
+    </defNumberVector>
+    <defNumberVector device="Seestar S50 Focuser" perm="ro" state="Idle" label="FOCUS_MAX" name="FOCUS_MAX">
+        <defNumber name="FOCUS_MAX_VALUE" step="1" max="0" min="0" format="%d" label="Focuser Maximum">2600</defNumber>
+    </defNumberVector>
+    <defSwitchVector device="Seestar S50 Focuser" rule="AtMostOne" perm="wo" state="Idle" label="Autofocus" name="AUTOFOCUS">
+        <defSwitch name="START_AUTOFOCUS" label="Start Autofocus Routine">Off</defSwitch>
+        <defSwitch name="STOP_AUTOFOCUS" label="Stop Autofocus Routine">Off</defSwitch>
+    </defSwitchVector>
+
+    <!-- filter wheel -->
+    <defNumberVector device="Seestar S50 Filter Wheel" perm="rw" state="Idle" label="FILTER_SLOT" name="FILTER_SLOT">
+        <defNumber name="FILTER_SLOT_VALUE" step="1" max="3" min="0" format="%d" label="Current Filter Position">3</defNumber>
+    </defNumberVector>
+    <defTextVector device="Seestar S50 Filter Wheel" perm="ro" state="Idle" label="Active Filter" name="FILTER_NAME">
+        <defText name="FILTER_NAME_VALUE" label="Current Filter Name">unset</defText>
+    </defTextVector>
+
+</INDIDriver>

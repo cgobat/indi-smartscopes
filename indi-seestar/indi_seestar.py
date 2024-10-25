@@ -12,7 +12,8 @@ from pyindi.device import (INumberVector, ISwitchVector, ITextVector, IBLOBVecto
                            INumber, ISwitch, IText, IBLOB, IPerm, ISRule, IPState, ISState)
 
 THIS_FILE_PATH = Path(__file__) # leave symlinks as-is/unresolved
-sys.path.append(THIS_FILE_PATH.resolve().parent.as_posix()) # resolve source directory
+SRC_DIR = THIS_FILE_PATH.resolve().parent
+sys.path.append(SRC_DIR.as_posix()) # resolve source directory
 
 from indi_device import MultiDevice
 from socket_connections import (DEFAULT_ADDR, CONFIG_DIR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT, GUIDER_PORT,
@@ -61,115 +62,11 @@ class SeestarDevice(MultiDevice):
                                      dev, "CONNECTION", IPState.IDLE, ISRule.ONEOFMANY,
                                      IPerm.RW, label="Device Connection"),
                        None)
-            
-        # **** telescope-specific properties ****
 
-        self.IDDef(INumberVector([INumber("RA", "%2.8f", 0, 24, 1, 0.0, label="RA"),
-                                  INumber("DEC", "%2.8f", -90, 90, 1, 0.0, label="Dec")],
-                                 self.scope_device, "EQUATORIAL_EOD_COORD", IPState.OK, IPerm.RW,
-                                 label="Sky Coordinates"),
-                   None)
+        self.buildSkeleton(SRC_DIR/"indi_seestar_skeleton.xml")
 
-        self.IDDef(INumberVector([INumber("ALT", "%2.8f", -90, 90, 1, 0.0, label="Altitude"),
-                                  INumber("AZ", "%2.8f", 0, 360, 1, 0.0, label="Azimuth")],
-                                 self.scope_device, "HORIZONTAL_COORD", IPState.OK, IPerm.RW,
-                                 label="Topocentric Coordinates"),
-                   None)
-
-        self.IDDef(ISwitchVector([ISwitch("SLEW", ISState.ON, "Slew"),
-                                  ISwitch("TRACK", ISState.OFF, "Track"),
-                                  ISwitch("SYNC", ISState.OFF, "Sync")],
-                                 self.scope_device, "ON_COORD_SET", IPState.IDLE, ISRule.ONEOFMANY,
-                                 IPerm.RW, label="On coord set"),
-                   None)
-
-        optics = {"focal_len": 250.0, "fnumber": 5.0}
-        self.IDDef(INumberVector([INumber("TELESCOPE_APERTURE", format="%f", min=0, max=None, step=1,
-                                          value=optics["focal_len"]/optics["fnumber"], label="Aperture (mm)"),
-                                  INumber("TELESCOPE_FOCAL_LENGTH", format="%f", min=0, max=None, step=1,
-                                          value=optics["focal_len"], label="Focal Length (mm)")],
-                                 self.scope_device, "TELESCOPE_INFO", IPState.IDLE, IPerm.RO, label="Optical Properties"),
-                   None)
-
-        self.IDDef(INumberVector([INumber("DEW_HEATER_POWER", format="%f", min=0, max=100, step=1,
-                                          value=0, label="Power Setting (%)")],
-                                 self.scope_device, "DEW_HEATER", state=IPState.IDLE, perm=IPerm.RW,
-                                 label="Dew Heater Power"),
-                   None)
-
-        self.IDDef(ISwitchVector([ISwitch("PARK", ISState.ON, "Close/Lower Arm"),
-                                  ISwitch("UNPARK", ISState.OFF, "Raise Arm")],
-                                 self.scope_device, "TELESCOPE_PARK", state=IPState.IDLE, rule=ISRule.ONEOFMANY,
-                                 perm=IPerm.RW, label="Raise/Lower Arm"),
-                   None)
-
-        self.IDDef(ISwitchVector([ISwitch("PIER_EAST", ISState.OFF),
-                                  ISwitch("PIER_WEST", ISState.OFF)],
-                                 self.scope_device, "TELESCOPE_PIER_SIDE", state=IPState.IDLE,
-                                 rule=ISRule.ATMOST1, perm=IPerm.RO, label="Mount Pier Side"),
-                   None)
-
-        # **** camera-specific properties ****
-
-        self.IDDef(INumberVector([INumber("CCD_MAX_X", format="%d", min=0, max=None, step=1, value=1080),
-                                  INumber("CCD_MAX_Y", format="%d", min=0, max=None, step=1, value=1920),
-                                  INumber("CCD_PIXEL_SIZE", format="%f", min=0, max=None, step=1, value=2.9),
-                                  INumber("CCD_PIXEL_SIZE_X", format="%f", min=0, max=None, step=1, value=2.9),
-                                  INumber("CCD_PIXEL_SIZE_Y", format="%f", min=0, max=None, step=1, value=2.9),
-                                  INumber("CCD_BITSPERPIXEL", format="%d", min=0, max=32, step=4, value=16)],
-                                 self.camera_device, "CCD_INFO", IPState.IDLE, IPerm.RO, label="Camera Properties"),
-                   None)
-
-        self.IDDef(ITextVector([IText("CFA_OFFSET_X", "0", "Bayer X offset"),
-                                IText("CFA_OFFSET_Y", "0", "Bayer Y offset"),
-                                IText("CFA_TYPE", "GRBG", "Bayer pattern")],
-                               self.camera_device, "CCD_CFA", IPState.IDLE, IPerm.RO, label="Bayer Matrix"),
-                   None)
-        
-        self.IDDef(ISwitchVector([ISwitch("FRAME_LIGHT", ISState.ON, label="Light"),
-                                  ISwitch("FRAME_BIAS", ISState.OFF, label="Bias"),
-                                  ISwitch("FRAME_DARK", ISState.OFF, label="Dark"),
-                                  ISwitch("FRAME_FLAT", ISState.OFF, label="Flat")],
-                                 self.camera_device, "CCD_FRAME_TYPE", IPState.IDLE, ISRule.ONEOFMANY,
-                                 IPerm.RW, label="Exposure Type"),
-                   None)
-        
-        self.IDDef(INumberVector([INumber("CCD_TEMPERATURE_VALUE", format="%f", min=-273.15, max=100., step=0.1,
-                                          value=0.0, label="Temperature (C)")],
-                                 self.camera_device, "CCD_TEMPERATURE", IPState.IDLE, IPerm.RO, label="Camera Temperature"),
-                   None)
-
-        
-        # **** focuser-specific properties ****
-
-        self.IDDef(INumberVector([INumber("FOCUS_ABSOLUTE_POSITION", "%d", 0, 2600,
-                                          5, value=1700, label="Focuser Position")],
-                                 self.focuser_device, "ABS_FOCUS_POSITION",
-                                 state=IPState.OK, perm=IPerm.RW),
-                   None)
-        
-        self.IDDef(INumberVector([INumber("FOCUS_MAX_VALUE", "%d", None, None,
-                                          1, 2600, label="Focuser Maximum")], # TODO: is this the same for everyone?
-                                 self.focuser_device, "FOCUS_MAX", state=IPState.IDLE, perm=IPerm.RO),
-                   None)
-        
-        self.IDDef(ISwitchVector([ISwitch("START_AUTOFOCUS", ISState.OFF, "Start Autofocus Routine"),
-                                  ISwitch("STOP_AUTOFOCUS", ISState.OFF, "Stop Autofocus Routine")],
-                                 self.focuser_device, "AUTOFOCUS", state=IPState.IDLE, rule=ISRule.ATMOST1,
-                                 perm=IPerm.WO, timeout=10., label="Autofocus"),
-                   None)
-        
-        # **** filter wheel-specific properties ****
-
-        self.IDDef(INumberVector([INumber("FILTER_SLOT_VALUE", format="%d", min=0, max=3, step=1,
-                                          value=3, label="Current Filter Position")],
-                                 self.filterwheel_device, "FILTER_SLOT", state=IPState.IDLE, perm=IPerm.RW),
-                   None)
-
-        self.IDDef(ITextVector([IText("FILTER_NAME_VALUE", "unset", label="Current Filter Name")],
-                                 self.filterwheel_device, "FILTER_NAME", state=IPState.IDLE, perm=IPerm.RO,
-                                 label="Active Filter"),
-                   None)
+        self.IDDef(IBLOBVector([IBLOB("CCD1", format=".fits", label="FITS image data")],
+                               self.camera_device, "CCD1", IPState.IDLE, IPerm.RO))
 
     def ISNewNumber(self, device, name, values, names):
         """A numeric vector has been updated from the client."""
@@ -422,7 +319,7 @@ class SeestarDevice(MultiDevice):
             return 3
         else:
             return response["result"]
-    
+
     def set_filter_position(self, pos: int):
         if pos in range(3):
             response = self.connection.send_cmd_and_await_response("set_wheel_position", params=[pos])
@@ -455,11 +352,11 @@ class SeestarDevice(MultiDevice):
     def start_auto_focus(self) -> bool:
         result = self.connection.send_cmd_and_await_response("start_auto_focuse")
         return result.get("code", 1) == 0
-    
+
     def stop_auto_focus(self) -> bool:
         result = self.connection.send_cmd_and_await_response("stop_auto_focuse")
         return result.get("code", 1) == 0
-    
+
     def focuser_loop_fn(self):
         self.IDMessage("Running focuser loop", msgtype="DEBUG", dev=self.focuser_device)
 
