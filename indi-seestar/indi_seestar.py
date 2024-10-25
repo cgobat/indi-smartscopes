@@ -224,15 +224,7 @@ class SeestarDevice(MultiDevice):
                 self.IDSet(heater)
 
         elif name == "CCD_EXPOSURE":
-            self.IDMessage(f"Initiating {values[0]} sec exposure", msgtype="DEBUG", dev=self.camera_device)
-
-            try:
-                self.connection.rpc_command("set_control_value",
-                                            params=["Exposure", int(values[0]*1000000)]) # in microseconds
-                self.connection.rpc_command("start_exposure", params=["light", False])
-
-            except Exception as error:
-                self.IDMessage(f"Seestar command error: {error}", msgtype="ERROR", dev=self.camera_device)
+            self.take_exposure(values[0])
 
         elif name == "ABS_FOCUS_POSITION":
             assert names[0] == "FOCUS_ABSOLUTE_POSITION"
@@ -405,6 +397,17 @@ class SeestarDevice(MultiDevice):
         result = self.connection.send_cmd_and_await_response("get_device_state",
                                                              params={"keys": ["mount"]})["result"]["mount"]
         return result["move_type"] != "none"
+
+    def take_exposure(self, duration_sec: float):
+        self.IDMessage(f"Initiating {duration_sec} second exposure", msgtype="DEBUG", dev=self.camera_device)
+
+        try:
+            self.connection.rpc_command("set_control_value",
+                                        params=["Exposure", int(duration_sec*1000000)]) # in microseconds
+            self.connection.rpc_command("start_exposure", params=["light", False])
+
+        except Exception as error:
+            self.IDMessage(f"Seestar command error: {error}", msgtype="ERROR", dev=self.camera_device)
 
     def get_filter_position(self) -> int:
         if "WheelMove" in self.connection.event_states:
