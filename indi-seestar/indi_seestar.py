@@ -175,7 +175,7 @@ class SeestarDevice(MultiDevice):
         """A numeric vector has been updated from the client."""
 
         if name in ("EQUATORIAL_EOD_COORD", "TARGET_EOD_COORD"):
-            current = self["EQUATORIAL_EOD_COORD"]
+            current = self.IUFind("EQUATORIAL_EOD_COORD", self.scope_device)
             curr_ra, curr_dec = float(current['RA'].value), float(current['DEC'].value)
 
             self.IDMessage(f"Current pointing: ({curr_ra}, {curr_dec})", msgtype="DEBUG", dev=self.scope_device)
@@ -188,7 +188,7 @@ class SeestarDevice(MultiDevice):
 
             self.IDMessage(f"Requested ({ra=}, {dec=})", msgtype="DEBUG", dev=self.scope_device)
 
-            switch = self['ON_COORD_SET']
+            switch = self.IUFind("ON_COORD_SET", self.scope_device)
             if switch['SLEW'].value == ISState.ON or switch['TRACK'].value == ISState.ON:
                 # Slew/GoTo requested
                 if self.is_moving():
@@ -380,7 +380,7 @@ class SeestarDevice(MultiDevice):
         self.IUUpdate(self.scope_device, "TELESCOPE_PARK", [ISState.ON, ISState.OFF], ["PARK", "UNPARK"], Set=True)
 
     def unpark_mount(self):
-        if self["TELESCOPE_PARK"]["PARK"].value == ISState.ON: # if currently parked
+        if self.IUFind("TELESCOPE_PARK", self.scope_device)["PARK"].value == ISState.ON: # if currently parked
             self.connection.rpc_command("scope_move_to_horizon")
         else:
             logger.info("Seestar is already unparked.")
@@ -492,7 +492,7 @@ class SeestarDevice(MultiDevice):
             return
 
         position = last_wheel_state["position"]
-        last_position = self["FILTER_SLOT"]["FILTER_SLOT_VALUE"].value
+        last_position = self.IUFind("FILTER_SLOT", self.filterwheel_device)["FILTER_SLOT_VALUE"].value
 
         if position == last_position:
             return
