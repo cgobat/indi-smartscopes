@@ -6,18 +6,17 @@ from pathlib import Path
 
 INDI_XML_DIR = Path("/usr/share/indi")
 INDI_BIN_DIR = Path("/usr/bin")
-SOURCE_DIR = Path(__file__).absolute().parent
-DRIVER_NAMES = ["indi_seestar_scope", "indi_seestar_focuser",
-                "indi_seestar_ccd", "indi_seestar_filterwheel"]
+SOURCE_DIR = Path(__file__).resolve().parent
+DRIVER_NAMES = ["indi_seestar"]
 
 
 def install():
 
-    while (proceed := input("You are about to install INDI drivers for the Seestar S50 mount, camera, "
-                            "focuser, and filter wheel. Proceed? [Y/n] ")) not in ("y", "yes", "n", "no"):
+    while (proceed := input("\nYou are about to \033[4minstall\033[m the INDI driver for the "
+                            "Seestar S50. Proceed? [Y/n] ").lower()) not in ("y", "yes", "n", "no"):
         print(f"Unrecognized input '{proceed}'. Enter 'yes' or 'no'.")
-    if proceed.lower().strip().startswith("n"):
-        print("Aborting without action.")
+    if proceed.startswith("n"):
+        print("Aborting without action.\n")
         return 0
 
     if not INDI_XML_DIR.is_dir():
@@ -37,14 +36,22 @@ def install():
         driver_destination.symlink_to(driver_executable)
         print(f"- Installed driver executable: '{driver_destination}'")
 
-    print(f"NOTE: modifying or removing files in the source directory ({SOURCE_DIR}) may break this installation.")
+    print(f"\nNOTE: modifying or removing files in the source directory ({SOURCE_DIR}) may break this installation.\n")
     return 0
 
 def uninstall():
+
+    while (proceed := input("\nYou are about to \033[3;4mun\033[m\033[4minstall\033[m the Seestar"
+                            " S50 INDI driver. Proceed? [Y/n] ").lower()) not in ("y", "yes", "n", "no"):
+        print(f"Unrecognized input '{proceed}'. Enter 'yes' or 'no'.")
+    if proceed.startswith("n"):
+        print("Aborting without action.\n")
+        return 0
+
     xml_definition_file = INDI_XML_DIR/"indi_seestar.xml"
     try:
         xml_definition_file.unlink()
-        print(f"Deleted '{xml_definition_file}'")
+        print(f"- Deleted '{xml_definition_file}'")
     except FileNotFoundError:
         print(f"File '{xml_definition_file} doesn't exist. No action taken.")
     
@@ -52,7 +59,7 @@ def uninstall():
         driver_path = INDI_BIN_DIR/driver_name
         try:
             driver_path.unlink()
-            print(f"Deleted '{driver_path}'")
+            print(f"- Deleted '{driver_path}'")
         except FileNotFoundError:
             print(f"File '{driver_path} doesn't exist. No action taken.")
 

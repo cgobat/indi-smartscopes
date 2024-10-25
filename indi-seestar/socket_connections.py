@@ -18,6 +18,7 @@ from collections import defaultdict
 logging.basicConfig(force=True, level=logging.DEBUG,
                     format="[%(levelname)s] %(message)s")
 
+GUIDER_PORT  = 4400
 CONTROL_PORT = 4700
 IMAGING_PORT = 4800
 LOGGING_PORT = 4801
@@ -67,7 +68,8 @@ class BaseConnectionManager(abc.ABC):
         self.port = int(port)
         self.socket = None
         self.connected = False
-    
+        self._do_listen = False
+
     @property
     def destination(self) -> str:
         return f"{self.address}:{self.port}"
@@ -104,6 +106,9 @@ class BaseConnectionManager(abc.ABC):
             logger.exception(f"Failed to send JSON to socket {self.socket}")
 
     def start_listening(self) -> threading.Thread:
+        if self._do_listen:
+            logger.warning(f"Already listening on socket {self.socket}")
+            return
         if not self.connected:
             self.connect()
         if not self.connected: # still not connected even after trying
