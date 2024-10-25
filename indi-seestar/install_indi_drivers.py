@@ -22,8 +22,8 @@ def install():
     if not INDI_XML_DIR.is_dir():
         print(f"Error: directory '{INDI_XML_DIR}' does not exist. Is the INDI library installed?")
         return 1
-    xml_definition_file = SOURCE_DIR/"indi_seestar.xml"
-    xml_destination = INDI_XML_DIR/xml_definition_file.name
+    xml_definition_file = SOURCE_DIR/"indi_seestar_driver_def.xml"
+    xml_destination = INDI_XML_DIR/"indi_seestar.xml"
     xml_destination.unlink(missing_ok=True)
     xml_destination.symlink_to(xml_definition_file)
     print(f"- Installed driver definition XML: '{xml_destination}'")

@@ -275,9 +275,16 @@ class ImageConnectionManager(RawConnectionManager, RPCConnectionManager):
 
     receive_loop = RawConnectionManager.receive_loop
 
-    def request_image():
-        ...
-    
+    def get_image_data(self):
+        self.start_listening()
+        self.send_json({"method": "get_current_img", "id": 0})
+        time.sleep(0.1)
+        while not self.raw_data:
+            logger.debug("Waiting for image data...")
+            time.sleep(2)
+        self.disconnect()
+        return self.raw_data
+
     def heartbeat_loop(self):
         while self._do_heartbeat:
             if not self.connected:
