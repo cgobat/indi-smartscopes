@@ -160,6 +160,8 @@ class RPCConnectionManager(BaseConnectionManager):
 
     def convert_timestamp(self, timestamp: "str|float"):
         time_responses = [response for _, response in self.rpc_responses.items() if response["method"]=="pi_get_time"]
+        if not time_responses:
+            time_responses = [self.send_cmd_and_await_response("pi_get_time")]
         if time_responses:
             most_recent = max(time_responses, key=lambda r: float(r["Timestamp"]))
             tdict = most_recent["result"]
