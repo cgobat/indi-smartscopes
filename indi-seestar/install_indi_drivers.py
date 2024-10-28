@@ -24,6 +24,9 @@ def install():
         print(f"Error: directory '{INDI_XML_DIR}' does not exist. Is the INDI library installed?")
         return 1
     xml_definition_file = INDI_XML_DIR/"drivers.xml"
+    if not xml_definition_file.is_file():
+        print(f"Error: XML file '{xml_definition_file}' does not exist. Is the INDI library installed?")
+        return 1
     driver_xml: xml._ElementTree = xml.parse(xml_definition_file.as_posix())
     for group, device in zip(["Telescopes", "Focusers", "CCDs", "Filter Wheels"],
                              ["Mount", "Focuser", "Camera", "Filter Wheel"]):
@@ -65,20 +68,31 @@ def uninstall():
         print("Aborting without action.\n")
         return 0
 
-    xml_definition_file = INDI_XML_DIR/"indi_seestar.xml"
+    xml_definition_file = INDI_XML_DIR/"drivers.xml"
     try:
-        xml_definition_file.unlink()
-        print(f"- Deleted '{xml_definition_file}'")
+        driver_xml: xml._ElementTree = xml.parse(xml_definition_file.as_posix())
+        for group, device in zip(["Telescopes", "Focusers", "CCDs", "Filter Wheels"],
+                                 ["Mount", "Focuser", "Camera", "Filter Wheel"]):
+            device_label = f"Seestar S50 {device}"
+            devGroup: xml._Element = driver_xml.find(f"devGroup[@group='{group}']")
+            existing = devGroup.find(f"device[@label='{device_label}']")
+            if existing is None:
+                print(f"- Driver for '{device_label}' is not currently present in {xml_definition_file}")
+            else:
+                devGroup.remove(existing)
+                print(f"- Removed '{device_label}' driver definition from {xml_definition_file}")
+        xml.indent(driver_xml, space=" "*4)
+        driver_xml.write(xml_definition_file.as_posix(), encoding="UTF-8",
+                         pretty_print=True, xml_declaration=True)
+    except OSError:
+        print(f"Warning: XML file '{xml_definition_file}' not found. No action taken.")
+
+    driver_path = INDI_BIN_DIR/DRIVER_EXE_NAME
+    try:
+        driver_path.unlink()
+        print(f"- Deleted '{driver_path}'")
     except FileNotFoundError:
-        print(f"File '{xml_definition_file} doesn't exist. No action taken.")
-    
-    for driver_name in DRIVER_NAMES:
-        driver_path = INDI_BIN_DIR/driver_name
-        try:
-            driver_path.unlink()
-            print(f"- Deleted '{driver_path}'")
-        except FileNotFoundError:
-            print(f"File '{driver_path} doesn't exist. No action taken.")
+        print(f"File '{driver_path} doesn't exist. No action taken.")
 
 
 if __name__ == "__main__":
