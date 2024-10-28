@@ -301,15 +301,26 @@ class ImageConnectionManager(RawConnectionManager, RPCConnectionManager):
 
 class LogConnectionManager(RawConnectionManager):
 
-    def get_log_dump(self):
+    def get_server_log(self):
         self.start_listening()
         self.send_json({"id": 44, "method": "get_server_log"})
+        time.sleep(0.1)
         while not self.raw_data:
             logger.debug("Waiting for log message...")
             time.sleep(2)
         self.disconnect()
         return self.raw_data
-    
+
+    def get_user_log(self):
+        self.start_listening()
+        self.send_json({"id": 5, "method": "get_user_log"})
+        time.sleep(0.1)
+        while not self.raw_data:
+            logger.debug("Waiting for log message...")
+            time.sleep(2)
+        self.disconnect()
+        return self.raw_data
+
     def heartbeat_loop(self):
         while self._do_heartbeat:
             if not self.connected:
@@ -320,13 +331,3 @@ class LogConnectionManager(RawConnectionManager):
                     continue
             self.send_json({"method": "test_connection", "id": 2})
             time.sleep(3)
-
-# this block will be executed whenever this file is run or anything here is imported
-# for port in (CONTROL_PORT,):# IMAGING_PORT, LOGGING_PORT):
-#     lock_fd = os.open(lock_file_path, os.O_CREAT|os.O_RDWR)
-#     try:
-#         fcntl.flock(lock_fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
-#         os.write(lock_fd, f"{os.getpid()}\n".encode())
-#     except BlockingIOError:
-#         logger.error(f"Another process already has a lock on {lock_file_path}")
-#         raise # for now
