@@ -41,12 +41,12 @@
 
     <!-- camera -->
     <defNumberVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Camera Properties" name="CCD_INFO">
-        <defNumber name="CCD_MAX_X" step="1" max="None" min="0" format="%d" label="CCD_MAX_X">1080</defNumber>
-        <defNumber name="CCD_MAX_Y" step="1" max="None" min="0" format="%d" label="CCD_MAX_Y">1920</defNumber>
+        <defNumber name="CCD_MAX_X" step="1" max="None" min="0" format="%.0f" label="CCD_MAX_X">1080</defNumber>
+        <defNumber name="CCD_MAX_Y" step="1" max="None" min="0" format="%.0f" label="CCD_MAX_Y">1920</defNumber>
         <defNumber name="CCD_PIXEL_SIZE" step="1" max="None" min="0" format="%.1f" label="CCD_PIXEL_SIZE">2.9</defNumber>
         <defNumber name="CCD_PIXEL_SIZE_X" step="1" max="None" min="0" format="%.1f" label="CCD_PIXEL_SIZE_X">2.9</defNumber>
         <defNumber name="CCD_PIXEL_SIZE_Y" step="1" max="None" min="0" format="%.1f" label="CCD_PIXEL_SIZE_Y">2.9</defNumber>
-        <defNumber name="CCD_BITSPERPIXEL" step="4" max="32" min="0" format="%d" label="CCD_BITSPERPIXEL">16</defNumber>
+        <defNumber name="CCD_BITSPERPIXEL" step="4" max="32" min="1" format="%.0f" label="CCD_BITSPERPIXEL">16</defNumber>
     </defNumberVector>
     <defTextVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Bayer Matrix" name="CCD_CFA">
         <defText name="CFA_OFFSET_X" label="Bayer X offset">0</defText>
@@ -65,11 +65,11 @@
     <!-- BLOB vector 'CCD1' defined in source -->
 
     <!-- focuser -->
-    <defNumberVector device="Seestar S50 Focuser" perm="rw" state="Ok" label="ABS_FOCUS_POSITION" name="ABS_FOCUS_POSITION">
-        <defNumber name="FOCUS_ABSOLUTE_POSITION" step="5" max="2600" min="0" format="%d" label="Focuser Position">1700</defNumber>
+    <defNumberVector device="Seestar S50 Focuser" perm="rw" state="Ok" label="Absolute Position" name="ABS_FOCUS_POSITION">
+        <defNumber name="FOCUS_ABSOLUTE_POSITION" step="5" max="2600" min="0" format="%.0f" label="Focuser Position">1700</defNumber>
     </defNumberVector>
     <defNumberVector device="Seestar S50 Focuser" perm="ro" state="Idle" label="FOCUS_MAX" name="FOCUS_MAX">
-        <defNumber name="FOCUS_MAX_VALUE" step="1" max="0" min="0" format="%d" label="Focuser Maximum">2600</defNumber>
+        <defNumber name="FOCUS_MAX_VALUE" step="1" max="2601" min="2599" format="%.0f" label="Focuser Maximum">2600</defNumber>
     </defNumberVector>
     <defSwitchVector device="Seestar S50 Focuser" rule="AtMostOne" perm="wo" state="Idle" label="Autofocus" name="AUTOFOCUS">
         <defSwitch name="START_AUTOFOCUS" label="Start Autofocus Routine">Off</defSwitch>
@@ -78,7 +78,7 @@
 
     <!-- filter wheel -->
     <defNumberVector device="Seestar S50 Filter Wheel" perm="rw" state="Idle" label="FILTER_SLOT" name="FILTER_SLOT">
-        <defNumber name="FILTER_SLOT_VALUE" step="1" max="3" min="0" format="%d" label="Current Filter Position">3</defNumber>
+        <defNumber name="FILTER_SLOT_VALUE" step="1" max="3" min="0" format="%.0f" label="Current Filter Position">3</defNumber>
     </defNumberVector>
     <defTextVector device="Seestar S50 Filter Wheel" perm="ro" state="Idle" label="Active Filter" name="FILTER_NAME">
         <defText name="FILTER_NAME_VALUE" label="Current Filter Name">unset</defText>

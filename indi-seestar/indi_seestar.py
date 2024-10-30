@@ -264,7 +264,7 @@ class SeestarDevice(MultiDevice):
             elif control["read_only"]:
                 logger.warning(f"Read-only camera property: {control['name']}")
                 continue
-            number = INumber("CCD_"+control["name"].upper(), "%f", control["min"], control["max"],
+            number = INumber("CCD_"+control["name"].upper(), "%.0f", control["min"], control["max"],
                              1, current_value, label=control["name"])
             cam_controls.append(number)
 
