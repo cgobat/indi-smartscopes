@@ -26,8 +26,8 @@
         <defSwitch name="UNPARK" label="Raise Arm">Off</defSwitch>
     </defSwitchVector>
     <defNumberVector device="Seestar S50 Telescope" perm="ro" state="Idle" label="Park Position" name="TELESCOPE_PARK_POSITION">
-        <defNumber name="PARK_ALT" step="1" max="90" min="-90" format="%f" label="Altitude">-90</defNumber>
-        <defNumber name="PARK_AZ" step="1" max="360" min="0" format="%f" label="Azimuth">0</defNumber>
+        <defNumber name="PARK_ALT" step="1" max="90" min="-90" format="%.1f" label="Altitude">-90</defNumber>
+        <defNumber name="PARK_AZ" step="1" max="360" min="0" format="%.1f" label="Azimuth">0</defNumber>
     </defNumberVector>
     <defSwitchVector device="Seestar S50 Telescope" rule="OneOfMany" perm="ro" state="Idle" label="Park Setting" name="TELESCOPE_PARK_OPTION">
         <defSwitch name="PARK_DEFAULT" label="Default">On</defSwitch>
@@ -41,11 +41,11 @@
 
     <!-- camera -->
     <defNumberVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Camera Properties" name="CCD_INFO">
-        <defNumber name="CCD_MAX_X" step="1" max="None" min="0" format="%.0f" label="Horizontal Pixel Count">1080</defNumber>
-        <defNumber name="CCD_MAX_Y" step="1" max="None" min="0" format="%.0f" label="Vertical Pixel Count">1920</defNumber>
-        <defNumber name="CCD_PIXEL_SIZE" step="1" max="None" min="0" format="%.1f" label="Pixel Size (square)">2.9</defNumber>
-        <defNumber name="CCD_PIXEL_SIZE_X" step="1" max="None" min="0" format="%.1f" label="Horizontal Pixel Size">2.9</defNumber>
-        <defNumber name="CCD_PIXEL_SIZE_Y" step="1" max="None" min="0" format="%.1f" label="Vertical Pixel Size">2.9</defNumber>
+        <defNumber name="CCD_MAX_X" step="1" max="None" min="0" format="%.0f" label="Horizontal Resolution">1080</defNumber>
+        <defNumber name="CCD_MAX_Y" step="1" max="None" min="0" format="%.0f" label="Vertical Resolution">1920</defNumber>
+        <defNumber name="CCD_PIXEL_SIZE" step="1" max="None" min="0" format="%.1f" label="Pixel Size (μm)">2.9</defNumber>
+        <defNumber name="CCD_PIXEL_SIZE_X" step="1" max="None" min="0" format="%.1f" label="Horizontal Pixel Size (μm)">2.9</defNumber>
+        <defNumber name="CCD_PIXEL_SIZE_Y" step="1" max="None" min="0" format="%.1f" label="Vertical Pixel Size (μm)">2.9</defNumber>
         <defNumber name="CCD_BITSPERPIXEL" step="4" max="32" min="1" format="%.0f" label="Bits Per Pixel">16</defNumber>
     </defNumberVector>
     <defTextVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Bayer Matrix" name="CCD_CFA">
@@ -60,13 +60,13 @@
         <defSwitch name="FRAME_FLAT" label="Flat">Off</defSwitch>
     </defSwitchVector>
     <defNumberVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Camera Temperature" name="CCD_TEMPERATURE">
-        <defNumber name="CCD_TEMPERATURE_VALUE" step="0.1" max="100.0" min="-273.15" format="%f" label="Temperature (C)">0.0</defNumber>
+        <defNumber name="CCD_TEMPERATURE_VALUE" step="0.1" max="100.0" min="-273.15" format="%.2f" label="Temperature (C)">0.0</defNumber>
     </defNumberVector>
     <!-- BLOB vector 'CCD1' defined in source -->
 
     <!-- focuser -->
     <defNumberVector device="Seestar S50 Focuser" perm="rw" state="Ok" label="Absolute Position" name="ABS_FOCUS_POSITION">
-        <defNumber name="FOCUS_ABSOLUTE_POSITION" step="5" max="2600" min="0" format="%.0f" label="Focuser Position">1700</defNumber>
+        <defNumber name="FOCUS_ABSOLUTE_POSITION" step="5" max="2600" min="1000" format="%.0f" label="Focuser Position">1700</defNumber>
     </defNumberVector>
     <defSwitchVector device="Seestar S50 Focuser" rule="OneOfMany" perm="rw" state="Idle" label="Travel Direction" name="FOCUS_MOTION">
         <defSwitch name="FOCUS_INWARD" label="Inward">Off</defSwitch>
@@ -76,7 +76,7 @@
         <defNumber name="FOCUS_RELATIVE_POSITION" step="5" max="50" min="0" format="%.0f" label="Steps">0</defNumber>
     </defNumberVector>
     <defNumberVector device="Seestar S50 Focuser" perm="ro" state="Idle" label="Focuser Maximum" name="FOCUS_MAX">
-        <defNumber name="FOCUS_MAX_VALUE" step="1" max="2601" min="2599" format="%.0f" label="Max. Position">2600</defNumber>
+        <defNumber name="FOCUS_MAX_VALUE" step="1" max="2600" min="2600" format="%.0f" label="Max. Position">2600</defNumber>
     </defNumberVector>
     <defSwitchVector device="Seestar S50 Focuser" rule="OneOfMany" perm="rw" state="Idle" label="Reverse Motion" name="FOCUS_REVERSE_MOTION">
         <defSwitch name="ENABLED" label="Enabled">Off</defSwitch>
