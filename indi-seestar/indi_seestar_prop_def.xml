@@ -26,8 +26,8 @@
         <defSwitch name="UNPARK" label="Raise Arm">Off</defSwitch>
     </defSwitchVector>
     <defNumberVector device="Seestar S50 Telescope" perm="ro" state="Idle" label="Park Position" name="TELESCOPE_PARK_POSITION">
-        <defNumber name="PARK_AZ" step="1" max="360" min="0" format="%f" label="Azimuth">0</defNumber>
         <defNumber name="PARK_ALT" step="1" max="90" min="-90" format="%f" label="Altitude">-90</defNumber>
+        <defNumber name="PARK_AZ" step="1" max="360" min="0" format="%f" label="Azimuth">0</defNumber>
     </defNumberVector>
     <defSwitchVector device="Seestar S50 Telescope" rule="OneOfMany" perm="ro" state="Idle" label="Park Setting" name="TELESCOPE_PARK_OPTION">
         <defSwitch name="PARK_DEFAULT" label="Default">On</defSwitch>
