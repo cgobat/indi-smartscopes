@@ -68,9 +68,23 @@
     <defNumberVector device="Seestar S50 Focuser" perm="rw" state="Ok" label="Absolute Position" name="ABS_FOCUS_POSITION">
         <defNumber name="FOCUS_ABSOLUTE_POSITION" step="5" max="2600" min="0" format="%.0f" label="Focuser Position">1700</defNumber>
     </defNumberVector>
+    <defSwitchVector device="Seestar S50 Focuser" rule="OneOfMany" perm="rw" state="Idle" label="Travel Direction" name="FOCUS_MOTION">
+        <defSwitch name="FOCUS_INWARD" label="Inward">Off</defSwitch>
+        <defSwitch name="FOCUS_OUTWARD" label="Outward">On</defSwitch>
+    </defSwitchVector>
+    <defNumberVector device="Seestar S50 Focuser" perm="wo" state="Ok" label="Relative Position" name="REL_FOCUS_POSITION">
+        <defNumber name="FOCUS_RELATIVE_POSITION" step="5" max="50" min="0" format="%.0f" label="Steps">0</defNumber>
+    </defNumberVector>
     <defNumberVector device="Seestar S50 Focuser" perm="ro" state="Idle" label="FOCUS_MAX" name="FOCUS_MAX">
         <defNumber name="FOCUS_MAX_VALUE" step="1" max="2601" min="2599" format="%.0f" label="Focuser Maximum">2600</defNumber>
     </defNumberVector>
+    <defSwitchVector device="Seestar S50 Focuser" rule="OneOfMany" perm="rw" state="Idle" label="Reverse Motion" name="FOCUS_REVERSE_MOTION">
+        <defSwitch name="ENABLED" label="Enabled">Off</defSwitch>
+        <defSwitch name="DISABLED" label="Disabled">On</defSwitch>
+    </defSwitchVector>
+    <defSwitchVector device="Seestar S50 Focuser" rule="OneOfMany" perm="wo" state="Idle" label="Cancel Motion" name="FOCUS_ABORT_MOTION">
+        <defSwitch name="ABORT" label="Abort">Off</defSwitch>
+    </defSwitchVector>
     <defSwitchVector device="Seestar S50 Focuser" rule="AtMostOne" perm="wo" state="Idle" label="Autofocus" name="AUTOFOCUS">
         <defSwitch name="START_AUTOFOCUS" label="Start Autofocus Routine">Off</defSwitch>
         <defSwitch name="STOP_AUTOFOCUS" label="Stop Autofocus Routine">Off</defSwitch>
