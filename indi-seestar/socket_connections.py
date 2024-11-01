@@ -10,6 +10,7 @@ import select
 import socket
 import struct
 import logging
+import requests
 import threading
 import datetime as dt
 from pathlib import Path
@@ -94,7 +95,7 @@ class BaseConnectionManager(abc.ABC):
         except:
             pass # hope for the best...
         self.connected = self._do_listen = self._do_heartbeat = False
-    
+
     def send_json(self, data: dict):
         if not self.connected:
             logger.error("Socket not connected. Can't send JSON.")
@@ -119,23 +120,30 @@ class BaseConnectionManager(abc.ABC):
         thread.start()
         logger.debug(f"Started listening on socket {self.socket}")
         return thread
-    
+
     def stop_listening(self):
         self._do_listen = False
-    
+
     def start_heartbeat(self) -> threading.Thread:
         thread = threading.Thread(target=self.heartbeat_loop)
         self._do_heartbeat = True
         thread.start()
         return thread
-    
+
     def stop_heartbeat(self):
         self._do_heartbeat = False
-    
+
+    def http_get(self, endpoint) -> requests.Response:
+        header = {"Connection": "Keep-Alive",
+                  "Accept-Encoding": "gzip",
+                  "User-Agent": "okhttp/4.2.2"}
+        response = requests.get(f"http://{self.address}{endpoint}", headers=header)
+        return response
+
     @abc.abstractmethod
     def receive_loop(self):
         ...
-    
+
     @abc.abstractmethod
     def heartbeat_loop(self):
         ...
@@ -195,7 +203,7 @@ class RPCConnectionManager(BaseConnectionManager):
                             logger.warning(f"Got non-zero return code in response to RPC command '{parsed['method']}' (ID: {parsed['id']})")
                     elif "Event" in parsed:
                         event_name = parsed["Event"]
-                        if parsed["Event"] == "PiStatus":
+                        if event_name == "PiStatus":
                             if "temp" in parsed:
                                 event_name += "_temperature"
                             elif "battery_capacity" in parsed:
