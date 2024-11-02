@@ -40,6 +40,31 @@
     </defSwitchVector>
 
     <!-- camera -->
+    <!-- 'CCD_EXPOSURE' and 'CCD_ABORT_EXPOSURE' are handled in source -->
+    <defNumberVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Camera Frame" name="CCD_FRAME">
+        <defNumber name="X" step="1" max="None" min="0" format="%.0f" label="Left-Most Pixel Index">0</defNumber>
+        <defNumber name="Y" step="1" max="None" min="0" format="%.0f" label="Top-Most Pixel Index">0</defNumber>
+        <defNumber name="WIDTH" step="1" max="None" min="0" format="%.0f" label="Frame Width">1080</defNumber>
+        <defNumber name="HEIGHT" step="1" max="None" min="0" format="%.0f" label="Frame Height">1920</defNumber>
+    </defNumberVector>
+    <!-- Number vector 'CCD_TEMPERATURE' defined in source -->
+    <defSwitchVector device="Seestar S50 Camera" rule="OneOfMany" perm="ro" state="Idle" label="Cooler Status" name="CCD_COOLER">
+        <defSwitch name="COOLER_ON" label="On">Off</defSwitch>
+        <defSwitch name="COOLER_OFF" label="Off">On</defSwitch>
+    </defSwitchVector>
+    <defNumberVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Cooler Power" name="CCD_COOLER_POWER">
+        <defNumber name="CCD_COOLER_VALUE" step="1" max="None" min="0" format="%.0f" label="Power (%)">0</defNumber>
+    </defNumberVector>
+    <defSwitchVector device="Seestar S50 Camera" rule="OneOfMany" perm="rw" state="Idle" label="Exposure Type" name="CCD_FRAME_TYPE">
+        <defSwitch name="FRAME_LIGHT" label="Light">On</defSwitch>
+        <defSwitch name="FRAME_BIAS" label="Bias">Off</defSwitch>
+        <defSwitch name="FRAME_DARK" label="Dark">Off</defSwitch>
+        <defSwitch name="FRAME_FLAT" label="Flat">Off</defSwitch>
+    </defSwitchVector>
+    <defNumberVector device="Seestar S50 Camera" perm="rw" state="Idle" label="Camera Binning" name="CCD_BINNING">
+        <defNumber name="HOR_BIN" step="1" max="2" min="1" format="%.0f" label="Horizontal Binning">1</defNumber>
+        <defNumber name="VER_BIN" step="1" max="2" min="1" format="%.0f" label="Vertical Binning">1</defNumber>
+    </defNumberVector>
     <defNumberVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Camera Properties" name="CCD_INFO">
         <defNumber name="CCD_MAX_X" step="1" max="None" min="0" format="%.0f" label="Horizontal Resolution">1080</defNumber>
         <defNumber name="CCD_MAX_Y" step="1" max="None" min="0" format="%.0f" label="Vertical Resolution">1920</defNumber>
@@ -53,12 +78,6 @@
         <defText name="CFA_OFFSET_Y" label="Bayer Y offset">0</defText>
         <defText name="CFA_TYPE" label="Bayer pattern">GRBG</defText>
     </defTextVector>
-    <defSwitchVector device="Seestar S50 Camera" rule="OneOfMany" perm="rw" state="Idle" label="Exposure Type" name="CCD_FRAME_TYPE">
-        <defSwitch name="FRAME_LIGHT" label="Light">On</defSwitch>
-        <defSwitch name="FRAME_BIAS" label="Bias">Off</defSwitch>
-        <defSwitch name="FRAME_DARK" label="Dark">Off</defSwitch>
-        <defSwitch name="FRAME_FLAT" label="Flat">Off</defSwitch>
-    </defSwitchVector>
     <defNumberVector device="Seestar S50 Camera" perm="ro" state="Idle" label="Camera Temperature" name="CCD_TEMPERATURE">
         <defNumber name="CCD_TEMPERATURE_VALUE" step="0.1" max="100.0" min="-273.15" format="%.2f" label="Temperature (C)">0.0</defNumber>
     </defNumberVector>
