@@ -14,6 +14,14 @@
         <defSwitch name="TRACK" label="Track">Off</defSwitch>
         <defSwitch name="SYNC" label="Sync">Off</defSwitch>
     </defSwitchVector>
+    <defSwitchVector device="Seestar S50 Telescope" rule="AtMostOne" perm="wo" state="Idle" label="Move North/South" name="TELESCOPE_MOTION_NS">
+        <defSwitch name="MOTION_NORTH" label="Move North">Off</defSwitch>
+        <defSwitch name="MOTION_SOUTH" label="Move South">Off</defSwitch>
+    </defSwitchVector>
+    <defSwitchVector device="Seestar S50 Telescope" rule="AtMostOne" perm="wo" state="Idle" label="Move East/West" name="TELESCOPE_MOTION_WE">
+        <defSwitch name="MOTION_WEST" label="Move West">Off</defSwitch>
+        <defSwitch name="MOTION_EAST" label="Move East">Off</defSwitch>
+    </defSwitchVector>
     <defNumberVector device="Seestar S50 Telescope" perm="ro" state="Idle" label="Optical Properties" name="TELESCOPE_INFO">
         <defNumber name="TELESCOPE_APERTURE" step="1" max="None" min="0" format="%.1f" label="Aperture (mm)">50.0</defNumber>
         <defNumber name="TELESCOPE_FOCAL_LENGTH" step="1" max="None" min="0" format="%.1f" label="Focal Length (mm)">250.0</defNumber>
