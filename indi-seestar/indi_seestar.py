@@ -121,7 +121,7 @@ class SeestarDevice(MultiDevice):
                 self.IDSet(heater)
 
         elif name == "CCD_EXPOSURE":
-            self.take_exposure(values[0])
+            self.take_exposure(float(values[0]))
 
         elif name == "CCD_BINNING":
             if len(set(values)) != 1:
@@ -243,6 +243,9 @@ class SeestarDevice(MultiDevice):
             foc_pos.max = focuser["max_step"]
             self.IDSet(foc_abs_vec)
 
+            self.connection.rpc_command("set_page", params=["preview"]) # "Preview" mode in ASIAIR allows easiest exposure behavior management
+            self.connection.rpc_command("set_sequence_setting", params=[{"group_name": "INDI"}]) # placeholder internal sequence name
+
         else:
             raise ValueError(f"Unrecognized connection action: {action}")
 
@@ -302,15 +305,35 @@ class SeestarDevice(MultiDevice):
         return result["move_type"] != "none"
 
     def take_exposure(self, duration_sec: float):
+        frame_type: ISwitchVector = self.IUFind("CCD_FRAME_TYPE", self.camera_device)
+        exp_mode = [switch.name for switch in frame_type.elements if switch.state==ISState.ON]
+        exp_mode = exp_mode.pop().split("_")[-1].lower()
+
         self.IDMessage(f"Initiating {duration_sec} second exposure", msgtype="DEBUG", dev=self.camera_device)
 
         try:
+            self.connection.event_states["Exposure"] = {"event": "Exposure", "state": None}
             self.connection.rpc_command("set_control_value",
-                                        params=["Exposure", int(duration_sec*1000000)]) # in microseconds
-            self.connection.rpc_command("start_exposure", params=["light", False])
+                                        params=["Exposure", round(duration_sec*1000000)]) # in microseconds
+            self.connection.rpc_command("start_exposure", params=[exp_mode, False])
 
         except Exception as error:
             self.IDMessage(f"Seestar command error: {error}", msgtype="ERROR", dev=self.camera_device)
+
+        while self.connection.event_states["Exposure"]["state"] != "complete":
+            time.sleep(duration_sec/10) # wait until exposure is finished
+        self.connection.event_states["SaveImage"] = {"event": "SaveImage", "state": None}
+        self.connection.rpc_command("save_image")
+        while (save_state := self.connection.event_states["SaveImage"])["state"] != "complete":
+            time.sleep(0.1) # wait until image has been saved
+        remote_image_path = save_state["fullname"]
+        if not remote_image_path.startswith("/"):
+            remote_image_path = "/"+remote_image_path
+        get_response = self.connection.http_get(remote_image_path)
+        ccd1_vector = self.IUFind("CCD1", self.camera_device)
+        ccd1_vector["CCD1"] = get_response.content
+        ccd1_vector.format = Path(remote_image_path).suffix
+        self.IDSetBLOB(ccd1_vector)
 
     def set_binning(self, bin_val: int):
         if bin_val not in (1, 2):
