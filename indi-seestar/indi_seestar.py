@@ -123,6 +123,12 @@ class SeestarDevice(MultiDevice):
         elif name == "CCD_EXPOSURE":
             self.take_exposure(values[0])
 
+        elif name == "CCD_BINNING":
+            if len(set(values)) != 1:
+                self.IDMessage("Binning must be square (e.g., 1x1 or 2x2)",
+                               msgtype="ERROR", dev=self.camera_device)
+            self.set_binning(int(values[0]))
+
         elif name == "ABS_FOCUS_POSITION":
             assert names[0] == "FOCUS_ABSOLUTE_POSITION"
             code = self.move_focuser_absolute(values[0])
@@ -305,6 +311,14 @@ class SeestarDevice(MultiDevice):
 
         except Exception as error:
             self.IDMessage(f"Seestar command error: {error}", msgtype="ERROR", dev=self.camera_device)
+
+    def set_binning(self, bin_val: int):
+        if bin_val not in (1, 2):
+            logger.warning(f"Binning can only be 1x1 or 2x2, not {bin_val}x{bin_val}")
+            return
+        self.connection.rpc_command("set_camera_bin", params=[bin_val])
+        self.IUUpdate(self.camera_device, "CCD_BINNING", [bin_val, bin_val],
+                      ["HOR_BIN", "VER_BIN"], Set=True)
 
     def get_filter_position(self) -> int:
         if "WheelMove" in self.connection.event_states:
