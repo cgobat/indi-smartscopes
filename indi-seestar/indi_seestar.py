@@ -159,6 +159,8 @@ class SeestarDevice(MultiDevice):
         elif name.startswith("TELESCOPE_MOTION_"):
             motion_direction = [switch_name for switch_name, switch_state in zip(names, values) if switch_state==ISState.ON]
             self.move_in_direction(motion_direction.pop().split("_")[-1].lower())
+            time.sleep(0.5)
+            self.IUUpdate(self.scope_device, name, [ISState.OFF]*len(values), names, Set=True)
 
         elif name == "TELESCOPE_ABORT_MOTION":
             keyvals = dict(zip(names, values))
@@ -296,9 +298,9 @@ class SeestarDevice(MultiDevice):
             logger.info("Seestar is already unparked.")
         self.IUUpdate(self.scope_device, "TELESCOPE_PARK", [ISState.OFF, ISState.ON], ["PARK", "UNPARK"], Set=True)
 
-    def move_in_direction(self, direction, quantity=3):
+    def move_in_direction(self, direction, duration=1):
         assert direction in ("north", "east", "south", "west")
-        self.connection.rpc_command("scope_move", params=[direction, quantity])
+        self.connection.rpc_command("scope_move", params=[direction, duration])
 
     def move_cw_by_angle(self, angle: int):
         """Rotate the telescope by `angle` degrees clockwise around the azimuth axis.
