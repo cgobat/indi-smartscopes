@@ -88,7 +88,7 @@ class SeestarDevice(MultiDevice):
             switch = self.IUFind("ON_COORD_SET", self.scope_device)
             if switch['SLEW'].value == ISState.ON or switch['TRACK'].value == ISState.ON:
                 # Slew/GoTo requested
-                if self.is_moving():
+                if self.mount_is_moving():
                     self.connection.rpc_command("scope_abort_slew")
                 cmd = "iscope_start_view"
                 params = {"mode": "star", "target_ra_dec": [ra, dec], "target_name": "INDI Target", "lp_filter": False}
