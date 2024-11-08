@@ -63,7 +63,7 @@ class SeestarDevice(MultiDevice):
                                      IPerm.RW, label="Device Connection"),
                        None)
 
-        self.buildSkeleton(SRC_DIR/"indi_seestar_prop_def.xml")
+        self.buildSkeleton(SRC_DIR/"indi_seestar_sk.xml")
 
         self.IDDef(IBLOBVector([IBLOB("CCD1", format=".fits", label="FITS image data")],
                                self.camera_device, "CCD1", IPState.IDLE, IPerm.RO))
