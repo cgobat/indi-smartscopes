@@ -60,13 +60,14 @@ class SeestarDevice(MultiDevice):
             self.IDDef(ISwitchVector([ISwitch("CONNECT", ISState.OFF, "Connect"),
                                       ISwitch("DISCONNECT", ISState.ON, "Disconnect")],
                                      dev, "CONNECTION", IPState.IDLE, ISRule.ONEOFMANY,
-                                     IPerm.RW, label="Device Connection"),
+                                     IPerm.RW, label="Connection", group="Connection"),
                        None)
 
         self.buildSkeleton(SRC_DIR/"indi_seestar_sk.xml")
 
         self.IDDef(IBLOBVector([IBLOB("CCD1", format=".fits", label="FITS image data")],
-                               self.camera_device, "CCD1", IPState.IDLE, IPerm.RO))
+                               self.camera_device, "CCD1", IPState.IDLE, IPerm.RO,
+                               label="BLOB Data", group="Data"))
 
     def ISNewNumber(self, device, name, values, names):
         """A numeric vector has been updated from the client."""
@@ -284,7 +285,7 @@ class SeestarDevice(MultiDevice):
             cam_controls.append(number)
 
         self.IDDef(INumberVector(cam_controls, self.camera_device, "CCD_CONTROLS", IPState.OK,
-                                 IPerm.RW, label="Camera Controls"),
+                                 IPerm.RW, label="Camera Controls", group="Controls"),
                    None)
 
     def park_mount(self):
