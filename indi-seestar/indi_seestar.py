@@ -132,7 +132,7 @@ class SeestarDevice(MultiDevice):
 
         elif name == "ABS_FOCUS_POSITION":
             assert names[0] == "FOCUS_ABSOLUTE_POSITION"
-            code = self.move_focuser_absolute(values[0])
+            code = self.move_focuser_absolute(int(values[0]))
             if code:
                 self.IDMessage(f"Attempt to set focuser position to {values[0]} returned code {code}.",
                                msgtype="ERROR", dev=self.focuser_device)
@@ -144,7 +144,7 @@ class SeestarDevice(MultiDevice):
 
         elif name == "FILTER_SLOT":
             assert names == ["FILTER_SLOT_VALUE"]
-            self.set_filter_position(values[0])
+            self.set_filter_position(int(values[0]))
 
         else:
             self.IDMessage(f"Client sent update for {device}'s {name} vector: {dict(zip(names, values))}",
@@ -342,9 +342,10 @@ class SeestarDevice(MultiDevice):
             remote_image_path = "/"+remote_image_path
         get_response = self.connection.http_get(remote_image_path)
         ccd1_vector = self.IUFind("CCD1", self.camera_device)
-        ccd1_vector["CCD1"] = get_response.content
-        ccd1_vector.format = Path(remote_image_path).suffix
-        self.IDSetBLOB(ccd1_vector)
+        ccd1_blob = ccd1_vector["CCD1"]
+        ccd1_blob.value = get_response.content
+        ccd1_blob.format = Path(remote_image_path).suffix
+        self.IDSetBLOB(ccd1_blob)
 
     def set_binning(self, bin_val: int):
         if bin_val not in (1, 2):
