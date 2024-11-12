@@ -57,9 +57,20 @@ class MultiDevice(IDevice):
                                                "device": dev or self._devname})
         self.outq.put_nowait(etree.tostring(xml))
 
+    async def toindiserver(self):
+        """Like superclass' `.toindiserver()` but uses `UnblockStdOut` class to prevent `BlockingIOError`s."""
+
+        while self.running:
+            output = await self.outq.get()
+
+            logging.debug(output.decode())
+            with UnblockStdOut():
+                self.writer.write(output.decode())
+                self.writer.flush()
+
     def start(self):
         """Like superclass' `.start()` but uses existing `self.mainloop` attribute if present."""
-        
+
         if self.mainloop is None:
             self.mainloop = asyncio.get_event_loop()
         self.reader, self.writer = self.mainloop.run_until_complete(stdio())
@@ -85,3 +96,20 @@ class MultiDevice(IDevice):
             *tasks
         )
         await future
+
+
+class UnblockStdOut:
+    """Configure stdout for non-blocking write
+    
+    Copied from https://github.com/scriptorron/indi_pylibcamera, who in turn got it from
+    https://stackoverflow.com/questions/67351928/getting-a-blockingioerror-when-printing-or-writting-to-stdout
+    """
+
+    def __enter__(self):
+        self.fd = sys.stdout.fileno()
+        self.flags_save = fcntl.fcntl(self.fd, fcntl.F_GETFL)
+        flags = self.flags_save & ~os.O_NONBLOCK
+        fcntl.fcntl(self.fd, fcntl.F_SETFL, flags)
+
+    def __exit__(self, *args):
+        fcntl.fcntl(self.fd, fcntl.F_SETFL, self.flags_save)
