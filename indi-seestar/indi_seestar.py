@@ -16,7 +16,7 @@ SRC_DIR = THIS_FILE_PATH.resolve().parent
 sys.path.append(SRC_DIR.as_posix()) # resolve source directory
 
 from indi_device import MultiDevice
-from socket_connections import (DEFAULT_ADDR, CONFIG_DIR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT, GUIDER_PORT,
+from socket_connections import (DEFAULT_ADDR, LOG_DIR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT, GUIDER_PORT,
                                 RPCConnectionManager, ImageConnectionManager, LogConnectionManager)
 
 logger = logging.getLogger(THIS_FILE_PATH.stem)
@@ -518,7 +518,7 @@ if __name__ == "__main__":
         if "--get-log" in sys.argv:
             log_connection: LogConnectionManager = get_connection_manager(DEFAULT_ADDR, LOGGING_PORT, "log")
             zip_data = log_connection.get_log_dump()
-            with (CONFIG_DIR/"seestar_svr_log.zip").open("wb+") as zipfile:
+            with (LOG_DIR/"seestar_svr_log.zip").open("wb+") as zipfile:
                 zipfile.write(zip_data)
             log_connection.disconnect()
             time.sleep(0.5)

@@ -16,7 +16,7 @@ import datetime as dt
 from pathlib import Path
 from collections import defaultdict
 
-logging.basicConfig(force=True, level=logging.DEBUG,
+logging.basicConfig(force=True, level=logging.INFO,
                     format="[%(levelname)s] %(message)s")
 
 GUIDER_PORT  = 4400
@@ -28,7 +28,8 @@ DEFAULT_ADDR = "seestar.local"
 MSG_END = b'\r\n'
 
 CONFIG_DIR = Path.home()/".indi_seestar"
-CONFIG_DIR.mkdir(exist_ok=True)
+LOG_DIR = CONFIG_DIR/"logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger()
 sockets_by_port = defaultdict(dict)
@@ -43,7 +44,7 @@ def get_socket(address: str, port: int) -> socket.socket:
         sock.settimeout(None)
         sock.connect((address, port))
         sockets_by_port[address][port] = sock
-        logger.debug(f"Established new socket connection to {address}:{port}")
+        logger.info(f"Established new socket connection to {address}:{port}")
     return sock
 
 def cleanup():
@@ -118,7 +119,7 @@ class BaseConnectionManager(abc.ABC):
         thread = threading.Thread(target=self.receive_loop)
         self._do_listen = True
         thread.start()
-        logger.debug(f"Started listening on socket {self.socket}")
+        logger.info(f"Started listening on socket {self.socket}")
         return thread
 
     def stop_listening(self):
