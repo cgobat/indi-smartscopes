@@ -15,9 +15,9 @@ class MultiDevice(IDevice):
     adding a `dev` argument to `.IDMessage()` in order to specify which device is emitting the
     message.
 
-    This class also slightly changes `.start()` and `.astart()` to actually use the optional `loop`
-    argument provided on instantiation. The superclass assigns that argument to the `.mainloop`
-    attribute but then doesn't ever do anything with it.
+    This class also slightly modifies the `.start()` and `.astart()` methods to actually use the
+    optional `loop` argument provided on instantiation. The superclass assigns that argument to the
+    `.mainloop` attribute but then doesn't ever do anything with it.
     """
 
     def __init__(self, devices=[], config=None, loop=None):
@@ -101,7 +101,7 @@ class MultiDevice(IDevice):
 
 
 class UnblockStdOut:
-    """Configure stdout for non-blocking write
+    """Configure stdout for writing without raising `BlockingIOError`.
     
     Copied from https://github.com/scriptorron/indi_pylibcamera, who in turn got it from
     https://stackoverflow.com/questions/67351928/getting-a-blockingioerror-when-printing-or-writting-to-stdout
