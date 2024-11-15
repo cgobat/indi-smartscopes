@@ -34,8 +34,7 @@ class MultiDevice(IDevice):
                         return p
                 else:
                     return p
-        else:
-            raise KeyError(f"No property with device {device!r} and name {name!r} found.")
+        raise KeyError(f"No property with device {device!r} and name {name!r} found.")
 
     def IDDef(self, prop, msg=None):
         """Register a property internally"""
@@ -109,9 +108,9 @@ class UnblockStdOut:
 
     def __enter__(self):
         self.fd = sys.stdout.fileno()
-        self.flags_save = fcntl.fcntl(self.fd, fcntl.F_GETFL)
-        flags = self.flags_save & ~os.O_NONBLOCK
-        fcntl.fcntl(self.fd, fcntl.F_SETFL, flags)
+        self.orig_flags = fcntl.fcntl(self.fd, fcntl.F_GETFL)
+        new_flags = self.orig_flags & ~os.O_NONBLOCK
+        fcntl.fcntl(self.fd, fcntl.F_SETFL, new_flags)
 
     def __exit__(self, *args):
-        fcntl.fcntl(self.fd, fcntl.F_SETFL, self.flags_save)
+        fcntl.fcntl(self.fd, fcntl.F_SETFL, self.orig_flags)
