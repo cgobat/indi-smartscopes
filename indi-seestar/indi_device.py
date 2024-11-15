@@ -1,4 +1,7 @@
 
+import os
+import sys
+import fcntl
 import asyncio
 import datetime as dt
 from lxml import etree
@@ -44,7 +47,7 @@ class MultiDevice(IDevice):
             self.props.append(prop)
         # Send it to the indiserver
         self.outq.put_nowait((etree.tostring(prop.Def(msg), pretty_print=True)))
-    
+
     def IDMessage(self, msg: str, timestamp = None, msgtype: str = "INFO", dev = None):
         """Send a message to the client"""
 
@@ -63,7 +66,6 @@ class MultiDevice(IDevice):
         while self.running:
             output = await self.outq.get()
 
-            logging.debug(output.decode())
             with UnblockStdOut():
                 self.writer.write(output.decode())
                 self.writer.flush()
