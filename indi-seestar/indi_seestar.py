@@ -159,9 +159,10 @@ class SeestarDevice(MultiDevice):
 
         elif name.startswith("TELESCOPE_MOTION_"):
             motion_direction = [switch_name for switch_name, switch_state in zip(names, values) if switch_state==ISState.ON]
-            self.move_in_direction(motion_direction.pop().split("_")[-1].lower())
-            time.sleep(0.5)
-            self.IUUpdate(self.scope_device, name, [ISState.OFF]*len(values), names, Set=True)
+            if motion_direction:
+                self.move_in_direction(motion_direction.pop().split("_")[-1].lower())
+                time.sleep(0.5)
+                self.IUUpdate(self.scope_device, name, [ISState.OFF]*len(values), names, Set=True)
 
         elif name == "TELESCOPE_ABORT_MOTION":
             keyvals = dict(zip(names, values))
@@ -218,10 +219,16 @@ class SeestarDevice(MultiDevice):
     def handle_connection_update(self, actions: "list[str]", states: "list[ISState]"):
         action = [act for act, switch in zip(actions, states) if switch==ISState.ON].pop()
         if action == "DISCONNECT":
+            if not self.connected:
+                self.IDMessage("Not currently connected!", dev=self.scope_device)
+                return
             self.connection.disconnect() # also stops listening and heartbeat
             vector_state = IPState.IDLE
 
         elif action == "CONNECT":
+            if self.connected:
+                self.IDMessage("Already connected!", dev=self.scope_device)
+                return
             self.connection.connect() # automatically starts heartbeat
             self.connection.start_listening()
             vector_state = IPState.OK
