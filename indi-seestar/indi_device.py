@@ -45,7 +45,7 @@ class MultiDevice(IDevice):
         if prop not in self.props:
             self.props.append(prop)
         # Send it to the indiserver
-        self.outq.put_nowait((etree.tostring(prop.Def(msg), pretty_print=True)))
+        self.outq.put_nowait(etree.tostring(prop.Def(msg), pretty_print=True))
 
     def IDMessage(self, msg: str, timestamp = None, msgtype: str = "INFO", dev = None):
         """Send a message to the client"""
@@ -57,7 +57,7 @@ class MultiDevice(IDevice):
         xml = etree.Element("message", attrib={"message": f"[{msgtype}] {msg}",
                                                "timestamp": timestamp,
                                                "device": dev or self._devname})
-        self.outq.put_nowait(etree.tostring(xml))
+        self.outq.put_nowait(etree.tostring(xml, pretty_print=True))
 
     async def toindiserver(self):
         """Like superclass' `.toindiserver()` but uses `UnblockStdOut` class to prevent `BlockingIOError`s."""
