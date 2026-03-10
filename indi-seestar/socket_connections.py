@@ -163,6 +163,13 @@ class RPCConnectionManager(BaseConnectionManager):
 
         payload = {"id": self.cmd_id, "method": command}
         payload.update(kwargs)
+        if "params" in payload:
+            if isinstance(payload["params"], dict):
+                payload["params"]["verify"] = True
+            elif "verify" not in payload["params"]:
+                payload["params"].append("verify")
+        else:
+            payload["params"] = ["verify"]
         self.send_json(payload)
         self.cmd_id += 1
         return payload["id"]
