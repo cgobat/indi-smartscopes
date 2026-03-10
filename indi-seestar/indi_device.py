@@ -14,10 +14,6 @@ class MultiDevice(IDevice):
     This is mostly just a matter of removing enforcement of checks against `self._devname`, and
     adding a `dev` argument to `.IDMessage()` in order to specify which device is emitting the
     message.
-
-    This class also slightly modifies the `.start()` and `.astart()` methods to actually use the
-    optional `loop` argument provided on instantiation. The superclass assigns that argument to the
-    `.mainloop` attribute but then doesn't ever do anything with it.
     """
 
     def __init__(self, devices=[], config=None, loop=None):
@@ -68,35 +64,6 @@ class MultiDevice(IDevice):
             with UnblockStdOut():
                 self.writer.write(output.decode())
                 self.writer.flush()
-
-    def start(self):
-        """Like superclass' `.start()` but uses existing `self.mainloop` attribute if present."""
-
-        if self.mainloop is None:
-            self.mainloop = asyncio.get_event_loop()
-        self.reader, self.writer = self.mainloop.run_until_complete(stdio())
-        self.running = True
-        future = asyncio.gather(
-            self.run(),
-            self.toindiserver(),
-            self.repeat_queuer()
-        )
-        self.mainloop.run_until_complete(future)
-
-    async def astart(self, *tasks):
-        """Like superclass' `.astart()` but uses existing `self.mainloop` attribute if present."""
-
-        if self.mainloop is None:
-            self.mainloop = asyncio.get_running_loop()
-        self.reader, self.writer = await stdio()
-        self.running = True
-        future = asyncio.gather(
-            self.run(),
-            self.toindiserver(),
-            self.repeat_queuer(),
-            *tasks
-        )
-        await future
 
 
 class UnblockStdOut:
