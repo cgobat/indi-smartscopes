@@ -28,11 +28,9 @@ def install():
         print(f"Error: XML file '{xml_definition_file}' does not exist. Is the INDI library installed?")
         return 1
     driver_xml: xml._ElementTree = xml.parse(xml_definition_file.as_posix())
-    for group, device in zip(["Telescopes", "Focusers", "CCDs", "Filter Wheels"],
-                             ["Mount", "Focuser", "Camera", "Filter Wheel"]):
-        device_label = f"Seestar S50 {device}"
-        driver_label = f"INDI Seestar {device}"
-        devGroup: xml._Element = driver_xml.find(f"devGroup[@group='{group}']")
+    devGroup: xml._Element = driver_xml.find(f"devGroup[@group='Telescopes']")
+    for device_label in ["Seestar S50", "Seestar S30", "Seestar S30 Pro"]:
+        driver_label = "pyINDI Seestar"
         existing = devGroup.find(f"device[@label='{device_label}']")
         if existing is None:
             device_elem = xml.SubElement(devGroup, "device",
@@ -71,10 +69,8 @@ def uninstall():
     xml_definition_file = INDI_XML_DIR/"drivers.xml"
     try:
         driver_xml: xml._ElementTree = xml.parse(xml_definition_file.as_posix())
-        for group, device in zip(["Telescopes", "Focusers", "CCDs", "Filter Wheels"],
-                                 ["Mount", "Focuser", "Camera", "Filter Wheel"]):
-            device_label = f"Seestar S50 {device}"
-            devGroup: xml._Element = driver_xml.find(f"devGroup[@group='{group}']")
+        devGroup: xml._Element = driver_xml.find(f"devGroup[@group='Telescopes']")
+        for device_label in ["Seestar S50", "Seestar S30", "Seestar S30 Pro"]:
             existing = devGroup.find(f"device[@label='{device_label}']")
             if existing is None:
                 print(f"- Driver for '{device_label}' is not currently present in {xml_definition_file}")
