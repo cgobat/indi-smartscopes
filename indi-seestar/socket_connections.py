@@ -26,6 +26,7 @@ LOGGING_PORT = 4801
 DEFAULT_ADDR = "seestar.local"
 
 MSG_END = b'\r\n'
+HEARTBEAT_PERIOD = 4 # seconds between test_connection sends
 
 CONFIG_DIR = Path.home()/".indi_seestar"
 LOG_DIR = CONFIG_DIR/"logs"
@@ -232,10 +233,10 @@ class RPCConnectionManager(BaseConnectionManager):
                 try:
                     self.connect()
                 except:
-                    time.sleep(3)
+                    time.sleep(HEARTBEAT_PERIOD)
                     continue
             self.rpc_command("test_connection", id="heartbeat")
-            time.sleep(3)
+            time.sleep(HEARTBEAT_PERIOD)
 
     def await_response(self, rpc_id: int):
         """Wait until a response corresponding to `rpc_id` appears, then return it."""
@@ -309,10 +310,10 @@ class ImageConnectionManager(RawConnectionManager, RPCConnectionManager):
                 try:
                     self.connect()
                 except:
-                    time.sleep(3)
+                    time.sleep(HEARTBEAT_PERIOD)
                     continue
             self.send_json({"method": "test_connection", "id": 1})
-            time.sleep(3)
+            time.sleep(HEARTBEAT_PERIOD)
 
 
 class LogConnectionManager(RawConnectionManager):
@@ -343,7 +344,7 @@ class LogConnectionManager(RawConnectionManager):
                 try:
                     self.connect()
                 except:
-                    time.sleep(3)
+                    time.sleep(HEARTBEAT_PERIOD)
                     continue
             self.send_json({"method": "test_connection", "id": 2})
-            time.sleep(3)
+            time.sleep(HEARTBEAT_PERIOD)
