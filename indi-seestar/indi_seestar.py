@@ -15,7 +15,7 @@ THIS_FILE_PATH = Path(__file__) # leave symlinks as-is/unresolved
 SRC_DIR = THIS_FILE_PATH.resolve().parent
 sys.path.append(SRC_DIR.as_posix()) # resolve source directory
 
-from indi_device import MultiDevice
+from indi_device import INDIDevice
 from socket_connections import (DEFAULT_ADDR, LOG_DIR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT, GUIDER_PORT,
                                 RPCConnectionManager, ImageConnectionManager, LogConnectionManager)
 
@@ -33,17 +33,10 @@ def get_connection_manager(address: str, port: int, kind: str):
     return cm
 
 
-class SeestarDevice(MultiDevice):
+class SeestarDevice(INDIDevice):
 
-    def __init__(self, host=DEFAULT_ADDR, scope_name = "Seestar S50 Telescope",
-                 camera_name = "Seestar S50 Camera", focuser_name = "Seestar S50 Focuser",
-                 filterwheel_name = "Seestar S50 Filter Wheel", config=None, loop=None):
-        super().__init__([scope_name, camera_name, focuser_name, filterwheel_name],
-                         config, loop)
-        self.scope_device = scope_name
-        self.camera_device = camera_name
-        self.focuser_device = focuser_name
-        self.filterwheel_device = filterwheel_name
+    def __init__(self, device_name="Seestar", config=None, loop=None):
+        super().__init__(loop=loop, config=config, name=device_name)
         self.connection: RPCConnectionManager = get_connection_manager(host, CONTROL_PORT, "rpc")
         self.guide_connection: RPCConnectionManager = get_connection_manager(host, GUIDER_PORT, "rpc")
         self.imager_connection: ImageConnectionManager = get_connection_manager(host, IMAGING_PORT, "img")
@@ -56,27 +49,25 @@ class SeestarDevice(MultiDevice):
     def ISGetProperties(self, device=None):
         """Called when client or indiserver sends `getProperties`."""
 
-        for dev in self.device_names:
-            self.IDDef(ISwitchVector([ISwitch("CONNECT", ISState.OFF, "Connect"),
-                                      ISwitch("DISCONNECT", ISState.ON, "Disconnect")],
-                                     dev, "CONNECTION", IPState.IDLE, ISRule.ONEOFMANY,
-                                     IPerm.RW, label="Connection", group="Connection"),
-                       None)
+        self.IDDef(ISwitchVector([ISwitch("CONNECT", ISState.OFF, "Connect"),
+                                  ISwitch("DISCONNECT", ISState.ON, "Disconnect")],
+                                 self.name(), "CONNECTION", IPState.IDLE, ISRule.ONEOFMANY,
+                                 IPerm.RW, label="Connection", group="General"))
 
         self.buildSkeleton(SRC_DIR/"indi_seestar_sk.xml")
 
         self.IDDef(IBLOBVector([IBLOB("CCD1", format=".fits", label="FITS image data")],
-                               self.camera_device, "CCD1", IPState.IDLE, IPerm.RO,
+                               self.name(), "CCD1", IPState.IDLE, IPerm.RO,
                                label="BLOB Data", group="Data"))
 
     def ISNewNumber(self, device, name, values, names):
         """A numeric vector has been updated from the client."""
 
         if name in ("EQUATORIAL_EOD_COORD", "TARGET_EOD_COORD"):
-            current = self.IUFind("EQUATORIAL_EOD_COORD", self.scope_device)
+            current = self.IUFind("EQUATORIAL_EOD_COORD")
             curr_ra, curr_dec = float(current['RA'].value), float(current['DEC'].value)
 
-            self.IDMessage(f"Current pointing: ({curr_ra}, {curr_dec})", msgtype="DEBUG", dev=self.scope_device)
+            self.IDMessage(f"Current pointing: ({curr_ra}, {curr_dec})", msgtype="DEBUG")
 
             for propname, value in zip(names, values):
                 if propname == "RA":
@@ -84,9 +75,9 @@ class SeestarDevice(MultiDevice):
                 elif propname == "DEC":
                     dec = value
 
-            self.IDMessage(f"Requested ({ra=}, {dec=})", msgtype="DEBUG", dev=self.scope_device)
+            self.IDMessage(f"Requested ({ra=}, {dec=})", msgtype="DEBUG")
 
-            switch = self.IUFind("ON_COORD_SET", self.scope_device)
+            switch = self.IUFind("ON_COORD_SET")
             if switch['SLEW'].value == ISState.ON or switch['TRACK'].value == ISState.ON:
                 # Slew/GoTo requested
                 if self.mount_is_moving():
@@ -103,7 +94,7 @@ class SeestarDevice(MultiDevice):
                 assert response["code"] == 0, f"Got non-zero response code {response['code']} ({response.get('error')})"
 
             except Exception as error:
-                self.IDMessage(f"Seestar command error: {error}", msgtype="ERROR", dev=self.scope_device)
+                self.IDMessage(f"Seestar command error: {error}", msgtype="ERROR")
 
             if name.startswith("TARGET"): # target coords don't automatically get updated in loop
                 self.IUUpdate(device, name, values, names, Set=True)
@@ -116,7 +107,7 @@ class SeestarDevice(MultiDevice):
                                                                                        "value": power}})
                 if reply["code"]:
                     heater.state = IPState.ALERT
-                    self.IDMessage("Error setting dew heater power", msgtype="ERROR", dev=self.scope_device)
+                    self.IDMessage("Error setting dew heater power", msgtype="ERROR")
                 else:
                     heater.state = IPState.OK
                 self.IDSet(heater)
@@ -127,7 +118,7 @@ class SeestarDevice(MultiDevice):
         elif name == "CCD_BINNING":
             if len(set(values)) != 1:
                 self.IDMessage("Binning must be square (e.g., 1x1 or 2x2)",
-                               msgtype="ERROR", dev=self.camera_device)
+                               msgtype="ERROR")
             self.set_binning(int(values[0]))
 
         elif name == "ABS_FOCUS_POSITION":
@@ -135,7 +126,7 @@ class SeestarDevice(MultiDevice):
             code = self.move_focuser_absolute(int(values[0]))
             if code:
                 self.IDMessage(f"Attempt to set focuser position to {values[0]} returned code {code}.",
-                               msgtype="ERROR", dev=self.focuser_device)
+                               msgtype="ERROR")
                 state = IPState.ALERT
             else:
                 state = IPState.OK
@@ -148,7 +139,7 @@ class SeestarDevice(MultiDevice):
 
         else:
             self.IDMessage(f"Client sent update for {device}'s {name} vector: {dict(zip(names, values))}",
-                           msgtype="DEBUG", dev=device)
+                           msgtype="DEBUG")
             vec = self.IUUpdate(device, name, values, names, Set=True)
 
     def ISNewSwitch(self, device, name, values, names):
@@ -162,7 +153,7 @@ class SeestarDevice(MultiDevice):
             if motion_direction:
                 self.move_in_direction(motion_direction.pop().split("_")[-1].lower())
                 time.sleep(0.5)
-                self.IUUpdate(self.scope_device, name, [ISState.OFF]*len(values), names, Set=True)
+                self.IUUpdate(self.name(), name, [ISState.OFF]*len(values), names, Set=True)
 
         elif name == "TELESCOPE_ABORT_MOTION":
             keyvals = dict(zip(names, values))
@@ -191,7 +182,7 @@ class SeestarDevice(MultiDevice):
                 self.IDSet(vec, msg="Autofocus canceled")
 
         else:
-            self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}", msgtype="DEBUG", dev=device)
+            self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}", msgtype="DEBUG")
             vec = self.IUUpdate(device, name, values, names, Set=True)
 
     def ISNewText(self, device, name, values, names):
@@ -206,28 +197,28 @@ class SeestarDevice(MultiDevice):
                     sign = "-" if utc_offset<0 else "+"
             time_utc = (time_set - dt.timedelta(hours=utc_offset)).timetuple()
             self.IDMessage(f"Setting device time to {time.strftime('%Y-%m-%dT%H:%M:%S', time_utc)}",
-                           msgtype="INFO", dev=self.scope_device)
+                           msgtype="INFO")
             # self.connection.rpc_command("scope_set_time", params=[time_set.isoformat(), f"{sign}{abs(utc_offset)}"])
             self.connection.rpc_command("pi_set_time", params={"year": time_utc.tm_year, "mon": time_utc.tm_mon,
                                                                "day": time_utc.tm_mday, "hour": time_utc.tm_hour,
                                                                "min": time_utc.tm_min, "sec": time_utc.tm_sec,
                                                                "time_zone": "Etc/UTC"})
         else:
-            self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}", msgtype="DEBUG", dev=device)
+            self.IDMessage(f"Updating {device} {name} with {dict(zip(names, values))}", msgtype="DEBUG")
             self.IUUpdate(device, name, values, names, Set=True)
 
     def handle_connection_update(self, actions: "list[str]", states: "list[ISState]"):
         action = [act for act, switch in zip(actions, states) if switch==ISState.ON].pop()
         if action == "DISCONNECT":
             if not self.connected:
-                self.IDMessage("Not currently connected!", dev=self.scope_device)
+                self.IDMessage("Not currently connected!")
                 return
             self.connection.disconnect() # also stops listening and heartbeat
             vector_state = IPState.IDLE
 
         elif action == "CONNECT":
             if self.connected:
-                self.IDMessage("Already connected!", dev=self.scope_device)
+                self.IDMessage("Already connected!")
                 return
             self.connection.connect() # automatically starts heartbeat
             self.connection.start_listening()
@@ -239,19 +230,19 @@ class SeestarDevice(MultiDevice):
 
             filter_pos = self.get_filter_position()
             self.filter_names = self.connection.send_cmd_and_await_response("get_wheel_slot_name")["result"]
-            self.IUUpdate(self.filterwheel_device, "FILTER_SLOT", [filter_pos], ["FILTER_SLOT_VALUE"], Set=True)
-            self.IUUpdate(self.filterwheel_device, "FILTER_NAME", [self.filter_names[filter_pos]],
+            self.IUUpdate(self.name(), "FILTER_SLOT", [filter_pos], ["FILTER_SLOT_VALUE"], Set=True)
+            self.IUUpdate(self.name(), "FILTER_NAME", [self.filter_names[filter_pos]],
                           ["FILTER_NAME_VALUE"], Set=True)
 
             focus_state = self.connection.send_cmd_and_await_response("get_device_state",
                                                                       params={"keys": ["focuser"]})
             focuser = focus_state["result"]["focuser"]
-            foc_max_vec: INumberVector = self.IUUpdate(self.focuser_device, "FOCUS_MAX", [focuser["max_step"]],
+            foc_max_vec: INumberVector = self.IUUpdate(self.name(), "FOCUS_MAX", [focuser["max_step"]],
                                                        ["FOCUS_MAX_VALUE"])
             foc_max_num: INumber = foc_max_vec["FOCUS_MAX_VALUE"]
             foc_max_num.value = foc_max_num.min = foc_max_num.max = focuser["max_step"]
             self.IDSet(foc_max_vec)
-            foc_abs_vec: INumberVector = self.IUUpdate(self.focuser_device, "ABS_FOCUS_POSITION", [focuser["step"]],
+            foc_abs_vec: INumberVector = self.IUUpdate(self.name(), "ABS_FOCUS_POSITION", [focuser["step"]],
                                                        ["FOCUS_ABSOLUTE_POSITION"])
             foc_pos: INumber = foc_abs_vec["FOCUS_ABSOLUTE_POSITION"]
             foc_pos.max = focuser["max_step"]
@@ -263,10 +254,9 @@ class SeestarDevice(MultiDevice):
         else:
             raise ValueError(f"Unrecognized connection action: {action}")
 
-        for dev in self.device_names:
-            connection_vec = self.IUUpdate(dev, "CONNECTION", states, actions)
-            connection_vec.state = vector_state
-            self.IDSet(connection_vec)
+        connection_vec = self.IUUpdate(self.name(), "CONNECTION", states, actions)
+        connection_vec.state = vector_state
+        self.IDSet(connection_vec)
 
     def define_camera_controls(self):
 
@@ -281,7 +271,7 @@ class SeestarDevice(MultiDevice):
             except KeyError:
                 logger.exception(f"{control['name']}: {response}")
             if control["name"] == "Temperature":
-                self.IUUpdate(self.camera_device, "CCD_TEMPERATURE", [current_value],
+                self.IUUpdate(self.name(), "CCD_TEMPERATURE", [current_value],
                               ["CCD_TEMPERATURE_VALUE"], Set=True)
                 continue
             elif control["read_only"]:
@@ -291,20 +281,20 @@ class SeestarDevice(MultiDevice):
                              1, current_value, label=control["name"])
             cam_controls.append(number)
 
-        self.IDDef(INumberVector(cam_controls, self.camera_device, "CCD_CONTROLS", IPState.OK,
-                                 IPerm.RW, label="Camera Controls", group="Controls"),
+        self.IDDef(INumberVector(cam_controls, self.name(), "CCD_CONTROLS", IPState.OK,
+                                 IPerm.RW, label="Camera Controls", group="Camera"),
                    None)
 
     def park_mount(self):
         self.connection.rpc_command("scope_park")
-        self.IUUpdate(self.scope_device, "TELESCOPE_PARK", [ISState.ON, ISState.OFF], ["PARK", "UNPARK"], Set=True)
+        self.IUUpdate(self.name(), "TELESCOPE_PARK", [ISState.ON, ISState.OFF], ["PARK", "UNPARK"], Set=True)
 
     def unpark_mount(self):
-        if self.IUFind("TELESCOPE_PARK", self.scope_device)["PARK"].value == ISState.ON: # if currently parked
+        if self.IUFind("TELESCOPE_PARK")["PARK"].value == ISState.ON: # if currently parked
             self.connection.rpc_command("scope_move_to_horizon")
         else:
             logger.info("Seestar is already unparked.")
-        self.IUUpdate(self.scope_device, "TELESCOPE_PARK", [ISState.OFF, ISState.ON], ["PARK", "UNPARK"], Set=True)
+        self.IUUpdate(self.name(), "TELESCOPE_PARK", [ISState.OFF, ISState.ON], ["PARK", "UNPARK"], Set=True)
 
     def move_in_direction(self, direction, duration=1):
         assert direction in ("north", "east", "south", "west")
@@ -323,11 +313,11 @@ class SeestarDevice(MultiDevice):
         return result["move_type"] != "none"
 
     def take_exposure(self, duration_sec: float):
-        frame_type: ISwitchVector = self.IUFind("CCD_FRAME_TYPE", self.camera_device)
+        frame_type: ISwitchVector = self.IUFind("CCD_FRAME_TYPE", self.name())
         exp_mode = [switch.name for switch in frame_type.elements if switch.state==ISState.ON]
         exp_mode = exp_mode.pop().split("_")[-1].lower()
 
-        self.IDMessage(f"Initiating {duration_sec} second exposure", msgtype="DEBUG", dev=self.camera_device)
+        self.IDMessage(f"Initiating {duration_sec} second exposure", msgtype="DEBUG")
 
         try:
             self.connection.event_states["Exposure"] = {"event": "Exposure", "state": None}
@@ -336,7 +326,7 @@ class SeestarDevice(MultiDevice):
             self.connection.rpc_command("start_exposure", params=[exp_mode, False])
 
         except Exception as error:
-            self.IDMessage(f"Seestar command error: {error}", msgtype="ERROR", dev=self.camera_device)
+            self.IDMessage(f"Seestar command error: {error}", msgtype="ERROR")
 
         while self.connection.event_states["Exposure"]["state"] != "complete":
             time.sleep(duration_sec/10) # wait until exposure is finished
@@ -348,7 +338,7 @@ class SeestarDevice(MultiDevice):
         if not remote_image_path.startswith("/"):
             remote_image_path = "/"+remote_image_path
         get_response = self.connection.http_get(remote_image_path)
-        ccd1_vector = self.IUFind("CCD1", self.camera_device)
+        ccd1_vector = self.IUFind("CCD1")
         ccd1_blob = ccd1_vector["CCD1"]
         ccd1_blob.value = get_response.content
         ccd1_blob.format = Path(remote_image_path).suffix
@@ -359,7 +349,7 @@ class SeestarDevice(MultiDevice):
             logger.warning(f"Binning can only be 1x1 or 2x2, not {bin_val}x{bin_val}")
             return
         self.connection.rpc_command("set_camera_bin", params=[bin_val])
-        self.IUUpdate(self.camera_device, "CCD_BINNING", [bin_val, bin_val],
+        self.IUUpdate(self.name(), "CCD_BINNING", [bin_val, bin_val],
                       ["HOR_BIN", "VER_BIN"], Set=True)
 
     def get_filter_position(self) -> int:
@@ -414,16 +404,16 @@ class SeestarDevice(MultiDevice):
         return result.get("code", 1) == 0
 
     def focuser_loop_fn(self):
-        self.IDMessage("Running focuser loop", msgtype="DEBUG", dev=self.focuser_device)
+        self.IDMessage("Running focuser loop", msgtype="DEBUG")
 
         last_focus_state = self.connection.event_states["FocuserMove"]
         if last_focus_state is None:
-            # self.IDMessage("No focuser status has been received yet.", msgtype="WARN", dev=self.focuser_device)
+            # self.IDMessage("No focuser status has been received yet.", msgtype="WARN")
             return
 
         position = last_focus_state["position"]
 
-        pos_vec = self.IUUpdate(self.focuser_device, "ABS_FOCUS_POSITION", [position], ["FOCUS_ABSOLUTE_POSITION"])
+        pos_vec = self.IUUpdate(self.name(), "ABS_FOCUS_POSITION", [position], ["FOCUS_ABSOLUTE_POSITION"])
 
         if last_focus_state["state"] == "complete":
             pos_vec.state = IPState.IDLE
@@ -437,21 +427,21 @@ class SeestarDevice(MultiDevice):
         self.IDSet(pos_vec, msg=f"Focuser position is {position}")
 
     def filter_loop_fn(self):
-        self.IDMessage("Running filter wheel loop", msgtype="DEBUG", dev=self.filterwheel_device)
+        self.IDMessage("Running filter wheel loop", msgtype="DEBUG")
 
         last_wheel_state = self.connection.event_states["WheelMove"]
         if last_wheel_state is None:
-            # self.IDMessage("No filter wheel status has been received yet.", msgtype="WARN", dev=self.filterwheel_device)
+            # self.IDMessage("No filter wheel status has been received yet.", msgtype="WARN")
             return
 
         position = last_wheel_state["position"]
-        last_position = self.IUFind("FILTER_SLOT", self.filterwheel_device)["FILTER_SLOT_VALUE"].value
+        last_position = self.IUFind("FILTER_SLOT")["FILTER_SLOT_VALUE"].value
 
         if position == last_position:
             return
 
-        pos_vec = self.IUUpdate(self.filterwheel_device, "FILTER_SLOT", [position], ["FILTER_SLOT_VALUE"])
-        name_vec = self.IUUpdate(self.filterwheel_device, "FILTER_NAME", [self.filter_names[position]], ["FILTER_NAME_VALUE"])
+        pos_vec = self.IUUpdate(self.name(), "FILTER_SLOT", [position], ["FILTER_SLOT_VALUE"])
+        name_vec = self.IUUpdate(self.name(), "FILTER_NAME", [self.filter_names[position]], ["FILTER_NAME_VALUE"])
 
         if last_wheel_state["state"] == "complete":
             pos_vec.state = IPState.IDLE
@@ -464,21 +454,21 @@ class SeestarDevice(MultiDevice):
         self.IDSet(name_vec)
 
     def camera_loop_fn(self):
-        self.IDMessage("Running camera loop", msgtype="DEBUG", dev=self.camera_device)
+        self.IDMessage("Running camera loop", msgtype="DEBUG")
         result = self.connection.send_cmd_and_await_response("get_control_value", params=["Temperature"])["result"]
-        self.IUUpdate(self.camera_device, 'CCD_TEMPERATURE', [result["value"]], ["CCD_TEMPERATURE_VALUE"], Set=True)
+        self.IUUpdate(self.name(), 'CCD_TEMPERATURE', [result["value"]], ["CCD_TEMPERATURE_VALUE"], Set=True)
 
     def scope_loop_fn(self):
-        self.IDMessage("Running telescope loop", msgtype="DEBUG", dev=self.scope_device)
+        self.IDMessage("Running telescope loop", msgtype="DEBUG")
         eq_coord = self.connection.send_cmd_and_await_response("scope_get_equ_coord")["result"]
         ra = eq_coord['ra']
         dec = eq_coord['dec']
-        self.IUUpdate(self.scope_device, "EQUATORIAL_EOD_COORD", [ra, dec], ["RA", "DEC"], Set=True)
+        self.IUUpdate(self.name(), "EQUATORIAL_EOD_COORD", [ra, dec], ["RA", "DEC"], Set=True)
         horiz_coord = self.connection.send_cmd_and_await_response("scope_get_horiz_coord")
         alt, az = horiz_coord["result"]
-        self.IUUpdate(self.scope_device, "HORIZONTAL_COORD", [alt, az], ["ALT", "AZ"], Set=True)
+        self.IUUpdate(self.name(), "HORIZONTAL_COORD", [alt, az], ["ALT", "AZ"], Set=True)
 
-    @MultiDevice.repeat(2500)
+    @INDIDevice.repeat(2500)
     def do_loop(self):
         if not self.connected:
             return
@@ -486,25 +476,25 @@ class SeestarDevice(MultiDevice):
         try:
             self.scope_loop_fn()
         except Exception as exc:
-            self.IDMessage(f"Error in telescope loop: {exc}", msgtype="ERROR", dev=self.scope_device)
+            self.IDMessage(f"Error in telescope loop: {exc}", msgtype="ERROR")
         try:
             self.camera_loop_fn()
         except Exception as exc:
-            self.IDMessage(f"Error in camera loop: {exc}", msgtype="ERROR", dev=self.camera_device)
+            self.IDMessage(f"Error in camera loop: {exc}", msgtype="ERROR")
         try:
             self.focuser_loop_fn()
         except Exception as exc:
-            self.IDMessage(f"Error in focuser loop: {exc}", msgtype="ERROR", dev=self.focuser_device)
+            self.IDMessage(f"Error in focuser loop: {exc}", msgtype="ERROR")
         try:
             self.filter_loop_fn()
         except Exception as exc:
-            self.IDMessage(f"Error in filter wheel loop: {exc}", msgtype="ERROR", dev=self.filterwheel_device)
+            self.IDMessage(f"Error in filter wheel loop: {exc}", msgtype="ERROR")
 
 
 if __name__ == "__main__":
 
     if THIS_FILE_PATH.name == "indi_seestar":
-        seestar = SeestarDevice(DEFAULT_ADDR)
+        seestar = SeestarDevice()
         seestar.start()
     else:
         scope_connection: RPCConnectionManager = get_connection_manager(DEFAULT_ADDR, CONTROL_PORT, "rpc")
