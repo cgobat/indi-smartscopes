@@ -64,7 +64,6 @@
         <defNumber name="WIDTH" step="1" max="None" min="0" format="%.0f" label="Frame Width">1080</defNumber>
         <defNumber name="HEIGHT" step="1" max="None" min="0" format="%.0f" label="Frame Height">1920</defNumber>
     </defNumberVector>
-    <!-- Number vector 'CCD_TEMPERATURE' defined in source -->
     <defSwitchVector device="Seestar" name="CCD_COOLER" label="Cooler Status" group="Camera" rule="OneOfMany" perm="ro" state="Idle">
         <defSwitch name="COOLER_ON" label="On">Off</defSwitch>
         <defSwitch name="COOLER_OFF" label="Off">On</defSwitch>

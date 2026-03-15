@@ -16,6 +16,7 @@ SRC_DIR = THIS_FILE_PATH.resolve().parent
 sys.path.append(SRC_DIR.as_posix()) # resolve source directory
 
 from indi_device import INDIDevice
+from install_indi_drivers import DRIVER_EXE_NAME, __version__
 from socket_connections import (DEFAULT_ADDR, LOG_DIR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT, GUIDER_PORT,
                                 RPCConnectionManager, ImageConnectionManager, LogConnectionManager)
 
@@ -37,14 +38,16 @@ class SeestarDevice(INDIDevice):
 
     def __init__(self, device_name="Seestar", config=None, loop=None):
         super().__init__(loop=loop, config=config, name=device_name)
-        self.connection: RPCConnectionManager = get_connection_manager(host, CONTROL_PORT, "rpc")
-        self.guide_connection: RPCConnectionManager = get_connection_manager(host, GUIDER_PORT, "rpc")
-        self.imager_connection: ImageConnectionManager = get_connection_manager(host, IMAGING_PORT, "img")
-        self.log_connection: LogConnectionManager = get_connection_manager(host, LOGGING_PORT, "log")
+        self.connection: RPCConnectionManager = None
+        # self.guide_connection: RPCConnectionManager = get_connection_manager(host, GUIDER_PORT, "rpc")
+        # self.imager_connection: ImageConnectionManager = get_connection_manager(host, IMAGING_PORT, "img")
+        # self.log_connection: LogConnectionManager = get_connection_manager(host, LOGGING_PORT, "log")
 
     @property
     def connected(self) -> bool:
-        return self.connection.connected
+        if self.connection is not None:
+            return self.connection.connected
+        return False
 
     def ISGetProperties(self, device=None):
         """Called when client or indiserver sends `getProperties`."""
@@ -53,6 +56,15 @@ class SeestarDevice(INDIDevice):
                                   ISwitch("DISCONNECT", ISState.ON, "Disconnect")],
                                  self.name(), "CONNECTION", IPState.IDLE, ISRule.ONEOFMANY,
                                  IPerm.RW, label="Connection", group="General"))
+        self.IDDef(ITextVector([IText("IP_ADDRESS", DEFAULT_ADDR, "Address")],
+                               self.name(), "NETWORK_CONFIG", IPState.IDLE, IPerm.RW,
+                               label="Network", group="General"))
+        self.IDDef(ITextVector([IText("DRIVER_NAME", "pyINDI Seestar", "Driver name"),
+                                IText("DRIVER_EXEC", DRIVER_EXE_NAME, "Driver exe"),
+                                IText("DRIVER_VERSION", __version__, "Version"),
+                                IText("DRIVER_INTERFACE", str(27), "Interface(s)")],
+                               self.name(), "DRIVER_INFO", IPState.IDLE, IPerm.RO,
+                               label="Driver Info", group="General"))
 
         self.buildSkeleton(SRC_DIR/"indi_seestar_sk.xml")
 
@@ -217,6 +229,9 @@ class SeestarDevice(INDIDevice):
             vector_state = IPState.IDLE
 
         elif action == "CONNECT":
+            if self.connection is None:
+                network_addr = self.IUFind("NETWORK_CONFIG")["IP_ADDRESS"].value
+                self.connection = get_connection_manager(network_addr, CONTROL_PORT, "rpc")
             if self.connected:
                 self.IDMessage("Already connected!")
                 return
