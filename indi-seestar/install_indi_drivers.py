@@ -2,14 +2,17 @@
 
 import os
 import sys
+import configparser
 from pathlib import Path
 from lxml import etree as xml
 
-INDI_XML_DIR = Path("/usr/share/indi")
-INDI_BIN_DIR = Path("/usr/bin")
 SOURCE_DIR = Path(__file__).resolve().parent
-DRIVER_EXE_NAME = "indi_seestar"
-
+config = configparser.ConfigParser(converters={"path": Path})
+config.read(SOURCE_DIR / "config.ini")
+INDI_XML_DIR = config["indi"].getpath("xml_dir")
+INDI_BIN_DIR = config["indi"].getpath("bin_dir")
+DRIVER_EXE_NAME = config["driver"].get("exe_name")
+__version__ = config["driver"].get("version")
 
 def install():
 
@@ -39,7 +42,7 @@ def install():
             driver_elem = xml.SubElement(device_elem, "driver", {"name": driver_label})
             driver_elem.text = DRIVER_EXE_NAME
             version_elem = xml.SubElement(device_elem, "version")
-            version_elem.text = "0.0.1" # TODO: read from __version__ ?
+            version_elem.text = __version__
             print(f"- Added '{device_label}' driver definition to {xml_definition_file}")
         else:
             print(f"- Driver for '{device_label}' already exists in {xml_definition_file}")
