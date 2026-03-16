@@ -1,0 +1,44 @@
+<driversSkeleton>
+  <defSwitchVector device="DWARF" name="ON_COORD_SET" label="On Set" group="Main Control" state="Idle" perm="rw" rule="OneOfMany">
+    <defSwitch name="SLEW" label="Slew">On</defSwitch>
+    <defSwitch name="TRACK" label="Track">Off</defSwitch>
+    <defSwitch name="SYNC" label="Sync">Off</defSwitch>
+  </defSwitchVector>
+  <defSwitchVector device="DWARF" name="TELESCOPE_ABORT_MOTION" label="Abort Motion" group="Motion Control" state="Idle" perm="rw" rule="AtMostOne">
+    <defSwitch name="ABORT_MOTION" label="Abort">Off</defSwitch>
+  </defSwitchVector>
+  <defSwitchVector device="DWARF" name="TELESCOPE_MOTION_NS" label="North/South" group="Motion Control" state="Idle" perm="rw" rule="AtMostOne">
+    <defSwitch name="MOTION_NORTH" label="North">Off</defSwitch>
+    <defSwitch name="MOTION_SOUTH" label="South">Off</defSwitch>
+  </defSwitchVector>
+  <defSwitchVector device="DWARF" name="TELESCOPE_MOTION_WE" label="West/East" group="Motion Control" state="Idle" perm="rw" rule="AtMostOne">
+    <defSwitch name="MOTION_WEST" label="West">Off</defSwitch>
+    <defSwitch name="MOTION_EAST" label="East">Off</defSwitch>
+  </defSwitchVector>
+  <defNumberVector device="DWARF" name="EQUATORIAL_EOD_COORD" label="Eq Coordinates" group="Main Control" state="Idle" perm="rw">
+    <defNumber name="RA" label="RA" format="%10.6m" min="0" max="24" step="0.1">0</defNumber>
+    <defNumber name="DEC" label="DEC" format="%10.6m" min="-90" max="90" step="0.1">0</defNumber>
+  </defNumberVector>
+  <defNumberVector device="DWARF" name="CCD_EXPOSURE" label="Exposure" group="Camera" state="Idle" perm="rw">
+    <defNumber name="CCD_EXPOSURE_VALUE" label="Seconds" format="%.3f" min="0.001" max="300" step="0.1">1.0</defNumber>
+  </defNumberVector>
+  <defNumberVector device="DWARF" name="CCD_BINNING" label="Binning" group="Camera" state="Idle" perm="rw">
+    <defNumber name="HOR_BIN" label="Hor" format="%.0f" min="1" max="2" step="1">1</defNumber>
+    <defNumber name="VER_BIN" label="Ver" format="%.0f" min="1" max="2" step="1">1</defNumber>
+  </defNumberVector>
+  <defNumberVector device="DWARF" name="CCD_TEMPERATURE" label="Temperature" group="Camera" state="Idle" perm="ro">
+    <defNumber name="CCD_TEMPERATURE_VALUE" label="C" format="%.1f" min="-50" max="100" step="0">0</defNumber>
+  </defNumberVector>
+  <defNumberVector device="DWARF" name="ABS_FOCUS_POSITION" label="Focus" group="Focuser" state="Idle" perm="rw">
+    <defNumber name="FOCUS_ABSOLUTE_POSITION" label="Steps" format="%.0f" min="0" max="20000" step="1">0</defNumber>
+  </defNumberVector>
+  <defNumberVector device="DWARF" name="FOCUS_MAX" label="Focus Max" group="Focuser" state="Idle" perm="ro">
+    <defNumber name="FOCUS_MAX_VALUE" label="Max" format="%.0f" min="0" max="20000" step="0">20000</defNumber>
+  </defNumberVector>
+  <defNumberVector device="DWARF" name="FILTER_SLOT" label="Filter Slot" group="Filter Wheel" state="Idle" perm="rw">
+    <defNumber name="FILTER_SLOT_VALUE" label="Slot" format="%.0f" min="0" max="2" step="1">0</defNumber>
+  </defNumberVector>
+  <defTextVector device="DWARF" name="FILTER_NAME" label="Filter Name" group="Filter Wheel" state="Idle" perm="ro">
+    <defText name="FILTER_NAME_VALUE" label="Name">VIS</defText>
+  </defTextVector>
+</driversSkeleton>
