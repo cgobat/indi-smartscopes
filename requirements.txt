@@ -1,0 +1,6 @@
+astropy
+lxml
+protobuf
+pyindi
+requests
+websockets
