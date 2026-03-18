@@ -12,8 +12,10 @@ from pyindi.device import (INumberVector, ISwitchVector, ITextVector, IBLOBVecto
                            INumber, ISwitch, IText, IBLOB, IPerm, ISRule, IPState, ISState)
 
 THIS_FILE_PATH = Path(__file__) # leave symlinks as-is/unresolved
-SRC_DIR = THIS_FILE_PATH.resolve().parent
-sys.path.append(SRC_DIR.as_posix()) # resolve source directory
+DRIVER_DIR = THIS_FILE_PATH.resolve().parent
+sys.path.append(DRIVER_DIR.as_posix()) # resolve source directory
+COMMON_DIR = DRIVER_DIR.parent / "common"
+sys.path.append(COMMON_DIR.as_posix())
 
 from indi_device import INDIDevice
 from install_indi_drivers import DRIVER_EXE_NAME, __version__
@@ -66,7 +68,7 @@ class SeestarDevice(INDIDevice):
                                self.name(), "DRIVER_INFO", IPState.IDLE, IPerm.RO,
                                label="Driver Info", group="General"))
 
-        self.buildSkeleton(SRC_DIR/"indi_seestar_sk.xml")
+        self.buildSkeleton(DRIVER_DIR/"indi_seestar_sk.xml")
 
         self.IDDef(IBLOBVector([IBLOB("CCD1", format=".fits", label="FITS image data")],
                                self.name(), "CCD1", IPState.IDLE, IPerm.RO,

@@ -28,13 +28,15 @@ from pyindi.device import (
 )
 
 THIS_FILE_PATH = Path(__file__)
-SRC_DIR = THIS_FILE_PATH.resolve().parent
-sys.path.append(SRC_DIR.as_posix())
-REPO_SRC = (SRC_DIR.parent / "src").resolve()
-if REPO_SRC.is_dir():
-    sys.path.append(REPO_SRC.as_posix())
+DRIVER_DIR = THIS_FILE_PATH.resolve().parent
+sys.path.append(DRIVER_DIR.as_posix())
+COMMON_DIR = DRIVER_DIR.parent / "common"
+sys.path.append(COMMON_DIR.as_posix())
+DWARFALP_SRC = (DRIVER_DIR / "dwarfAlp" / "src").resolve()
+if DWARFALP_SRC.is_dir():
+    sys.path.append(DWARFALP_SRC.as_posix())
 else:
-    raise FileNotFoundError(f"Expected to find directory '{REPO_SRC}' but didn't!")
+    raise FileNotFoundError(f"Missing expected directory '{DWARFALP_SRC}'. Have git submodules been initialized?")
 
 from indi_device import INDIDevice
 from install_indi_drivers import DRIVER_EXE_NAME, __version__
@@ -89,7 +91,7 @@ class DwarfDevice(INDIDevice):
                 self.name(), "DRIVER_INFO", IPState.IDLE, IPerm.RO, label="Driver Info", group="General"
             )
         )
-        self.buildSkeleton(SRC_DIR / "indi_dwarf_sk.xml")
+        self.buildSkeleton(DRIVER_DIR / "indi_dwarf_sk.xml")
         self.IDDef(
             IBLOBVector([IBLOB("CCD1", format=".fits", label="Image data")], self.name(), "CCD1", IPState.IDLE, IPerm.RO, label="BLOB Data", group="Data")
         )
