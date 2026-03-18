@@ -6,13 +6,14 @@ import configparser
 from pathlib import Path
 from lxml import etree as xml
 
-SOURCE_DIR = Path(__file__).resolve().parent
+DRIVER_DIR = Path(__file__).resolve().parent
+COMMON_DIR = DRIVER_DIR.parent / "common"
 config = configparser.ConfigParser(converters={"path": Path})
-config.read(SOURCE_DIR / "config.ini")
+config.read(COMMON_DIR / "config.ini")
 INDI_XML_DIR = config["indi"].getpath("xml_dir")
 INDI_BIN_DIR = config["indi"].getpath("bin_dir")
-DRIVER_EXE_NAME = "indi_dwarf"
-__version__ = "0.1"
+DRIVER_EXE_NAME = config["dwarf"].get("exe_name")
+__version__ = config["dwarf"].get("version")
 
 
 def install() -> int:
@@ -33,7 +34,7 @@ def install() -> int:
     xml.indent(driver_xml, space=" "*4)
     driver_xml.write(xml_definition_file.as_posix(), encoding="UTF-8", pretty_print=True, xml_declaration=True)
 
-    driver_source = SOURCE_DIR / "indi_dwarf.py"
+    driver_source = DRIVER_DIR / "indi_dwarf.py"
     driver_source.chmod(driver_source.stat().st_mode | 0o111)
 
     driver_destination = INDI_BIN_DIR / DRIVER_EXE_NAME

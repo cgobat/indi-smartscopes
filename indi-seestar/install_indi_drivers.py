@@ -6,18 +6,19 @@ import configparser
 from pathlib import Path
 from lxml import etree as xml
 
-SOURCE_DIR = Path(__file__).resolve().parent
+DRIVER_DIR = Path(__file__).resolve().parent
+COMMON_DIR = DRIVER_DIR.parent / "common"
 config = configparser.ConfigParser(converters={"path": Path})
-config.read(SOURCE_DIR / "config.ini")
+config.read(COMMON_DIR / "config.ini")
 INDI_XML_DIR = config["indi"].getpath("xml_dir")
 INDI_BIN_DIR = config["indi"].getpath("bin_dir")
-DRIVER_EXE_NAME = config["driver"].get("exe_name")
-__version__ = config["driver"].get("version")
+DRIVER_EXE_NAME = config["seestar"].get("exe_name")
+__version__ = config["seestar"].get("version")
 
 def install():
 
-    while (proceed := input("\nYou are about to \033[4minstall\033[m the INDI driver for the "
-                            "Seestar S50. Proceed? [Y/n] ").lower()) not in ("y", "yes", "n", "no"):
+    while (proceed := input("\nYou are about to \033[4minstall\033[m the Seestar INDI driver."
+                            " Proceed? [Y/n] ").lower()) not in ("y", "yes", "n", "no"):
         print(f"Unrecognized input '{proceed}'. Enter 'yes' or 'no'.")
     if proceed.startswith("n"):
         print("Aborting without action.\n")
@@ -50,14 +51,14 @@ def install():
     driver_xml.write(xml_definition_file.as_posix(), encoding="UTF-8",
                      pretty_print=True, xml_declaration=True)
 
-    driver_executable = SOURCE_DIR/"indi_seestar.py"
+    driver_executable = DRIVER_DIR / "indi_seestar.py"
     driver_executable.chmod(driver_executable.stat().st_mode | 0o111) # ensure executability
     driver_destination = INDI_BIN_DIR/DRIVER_EXE_NAME
     driver_destination.unlink(missing_ok=True)
     driver_destination.symlink_to(driver_executable)
     print(f"- Installed driver executable: '{driver_destination}'")
 
-    print(f"\nNOTE: modifying or removing files in the source directory ({SOURCE_DIR}) may break this installation.\n")
+    print(f"\nNOTE: modifying or removing files in the source directory ({DRIVER_DIR}) may break this installation.\n")
     return 0
 
 def uninstall():
