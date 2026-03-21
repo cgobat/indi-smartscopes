@@ -4,6 +4,7 @@ import sys
 import time
 import logging
 import tzlocal
+import configparser
 import datetime as dt
 from pathlib import Path
 from collections import defaultdict
@@ -18,9 +19,13 @@ COMMON_DIR = DRIVER_DIR.parent / "common"
 sys.path.append(COMMON_DIR.as_posix())
 
 from indi_device import INDIDevice
-from install_indi_drivers import DRIVER_EXE_NAME, __version__
 from socket_connections import (DEFAULT_ADDR, LOG_DIR, CONTROL_PORT, IMAGING_PORT, LOGGING_PORT, GUIDER_PORT,
                                 RPCConnectionManager, ImageConnectionManager, LogConnectionManager)
+
+config = configparser.ConfigParser()
+config.read(COMMON_DIR / "config.ini")
+DRIVER_EXE_NAME = config["seestar"].get("exe_name")
+DRIVER_VERSION = config["seestar"].get("version")
 
 logger = logging.getLogger(THIS_FILE_PATH.stem)
 connection_managers = defaultdict(dict)
@@ -63,7 +68,7 @@ class SeestarDevice(INDIDevice):
                                label="Network", group="General"))
         self.IDDef(ITextVector([IText("DRIVER_NAME", "pyINDI Seestar", "Driver name"),
                                 IText("DRIVER_EXEC", DRIVER_EXE_NAME, "Driver exe"),
-                                IText("DRIVER_VERSION", __version__, "Version"),
+                                IText("DRIVER_VERSION", DRIVER_VERSION, "Version"),
                                 IText("DRIVER_INTERFACE", str(27), "Interface(s)")],
                                self.name(), "DRIVER_INFO", IPState.IDLE, IPerm.RO,
                                label="Driver Info", group="General"))
